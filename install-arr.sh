@@ -550,16 +550,17 @@ echo ""
 echo "📁 Configuration : $INSTALL_DIR/config/config.yaml.local"
 echo "📝 Logs : $INSTALL_DIR/logs/arr-monitor.log"
 echo ""
-echo "🔧 Pour créer un service système (optionnel) :"
+echo "🔧 Installation automatique du service système :"
 echo ""
-if [ "$FORCE_INSTALL" = true ]; then
-    # Mode non-interactif pour --update - ne pas installer le service automatiquement
-    INSTALL_SERVICE="N"
+
+# Installation automatique du service systemd (sauf en mode update)
+if [ "$OPERATION_MODE" = "update" ]; then
     echo "📋 Mode mise à jour : service systemd non modifié"
+    INSTALL_SERVICE="N"
 else
-    read -p "🛠️  Voulez-vous installer le service systemd ? [y/N] : " INSTALL_SERVICE
+    echo "🛠️  Installation automatique du service systemd..."
+    INSTALL_SERVICE="Y"
 fi
-INSTALL_SERVICE=${INSTALL_SERVICE:-N}
 
 if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
     # Vérifier la disponibilité du fichier service
@@ -617,35 +618,43 @@ if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
         rm -f arr-monitor.service.tmp
         
         echo "✅ Service systemd installé et activé"
-        echo "   sudo systemctl start arr-monitor    # Démarrer"
-        echo "   sudo systemctl status arr-monitor   # Vérifier le statut"
-        echo "   sudo journalctl -u arr-monitor -f   # Voir les logs"
         
-        # Test du service
+        # Vérification finale du statut du service
         echo ""
-        echo "🧪 Test du service systemd..."
-        if sudo systemctl start arr-monitor && sleep 2 && sudo systemctl is-active --quiet arr-monitor; then
-            echo "✅ Service démarré avec succès"
+        echo "🔍 Vérification finale du service..."
+        sleep 3  # Laisser le temps au service de démarrer
+        
+        if sudo systemctl is-active --quiet arr-monitor; then
+            echo "✅ Service arr-monitor : ACTIF et FONCTIONNEL"
+            echo "   📊 Statut : $(sudo systemctl is-active arr-monitor)"
+            echo "   🔄 État : $(sudo systemctl is-enabled arr-monitor)"
         else
-            echo "⚠️  Problème de démarrage du service"
-            echo "📋 Vérification des logs :"
-            sudo journalctl -u arr-monitor -n 10 --no-pager
+            echo "❌ Service arr-monitor : PROBLÈME DÉTECTÉ"
+            echo "   📊 Statut : $(sudo systemctl is-active arr-monitor)"
+            echo "   🔄 État : $(sudo systemctl is-enabled arr-monitor)"
+            echo ""
+            echo "📋 Logs récents du service :"
+            sudo journalctl -u arr-monitor -n 5 --no-pager
         fi
+        
+        echo ""
+        echo "📋 Commandes utiles pour le service :"
+        echo "   sudo systemctl start arr-monitor    # Démarrer"
+        echo "   sudo systemctl stop arr-monitor     # Arrêter"
+        echo "   sudo systemctl restart arr-monitor  # Redémarrer"
+        echo "   sudo systemctl status arr-monitor   # Vérifier le statut"
+        echo "   sudo journalctl -u arr-monitor -f   # Voir les logs en temps réel"
     else
         echo "⚠️  Fichier service non disponible"
         echo "💡 Vous pouvez créer le service manuellement avec les instructions ci-dessous"
     fi
 else
-    echo "📋 Service systemd non installé"
+    echo "📋 Mode mise à jour : service systemd préservé"
     echo ""
-    echo "💡 Pour installer le service plus tard :"
-    echo "   cd $INSTALL_DIR"
-    echo "   sudo cp arr-monitor.service /etc/systemd/system/"
-    echo "   sudo sed -i 's/%USER%/$USER/g' /etc/systemd/system/arr-monitor.service"
-    echo "   sudo sed -i 's|%INSTALL_DIR%|$INSTALL_DIR|g' /etc/systemd/system/arr-monitor.service"
-    echo "   sudo systemctl daemon-reload"
-    echo "   sudo systemctl enable arr-monitor"
-    echo "   sudo systemctl start arr-monitor"
+    echo "💡 Pour gérer le service :"
+    echo "   sudo systemctl restart arr-monitor  # Redémarrer avec la nouvelle version"
+    echo "   sudo systemctl status arr-monitor   # Vérifier le statut"
+    echo "   sudo journalctl -u arr-monitor -f   # Voir les logs"
 fi
 
 echo ""
