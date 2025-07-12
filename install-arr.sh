@@ -4,6 +4,18 @@
 set -euo pipefail
 
 echo "🚀 Installation Arr Monitor - Surveillance Sonarr/Radarr"
+echo ""
+echo "📂 Ce script va :"
+echo "   • Copier les fichiers depuis le répertoire courant"
+echo "   • Les installer dans un répertoire de destination"
+echo "   • Créer un environnement Python virtuel"
+echo "   • Configurer l'application de manière interactive"
+echo ""
+echo "💡 Utilisation typique :"
+echo "   git clone https://github.com/kesurof/Arr-Monitor.git"
+echo "   cd Arr-Monitor"
+echo "   ./install-arr.sh"
+echo ""
 
 # Vérification des prérequis
 if ! command -v python3 &> /dev/null; then
@@ -16,27 +28,67 @@ if ! command -v pip3 &> /dev/null; then
     exit 1
 fi
 
-# Répertoire d'installation
-INSTALL_DIR="${HOME}/arr-monitor"
+# Demander l'emplacement pour l'installation
+echo ""
+read -p "📁 Répertoire d'installation des scripts [/home/$USER/scripts] : " SCRIPTS_DIR
+SCRIPTS_DIR=${SCRIPTS_DIR:-/home/$USER/scripts}
+
+# Répertoire d'installation final
+INSTALL_DIR="$SCRIPTS_DIR/arr-monitor"
 echo "📁 Installation dans : $INSTALL_DIR"
 
-# Création du répertoire d'installation
-if [ -d "$INSTALL_DIR" ]; then
-    echo "📂 Le répertoire existe déjà. Mise à jour..."
-    cd "$INSTALL_DIR"
-else
-    echo "📥 Création du répertoire d'installation..."
-    mkdir -p "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
+# Déterminer le répertoire source AVANT de changer de répertoire
+SOURCE_DIR="$(dirname "$0")"
+SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd)"
+echo "📋 Répertoire source : $SOURCE_DIR"
+
+# Vérification des fichiers requis dans le répertoire source
+REQUIRED_FILES=("arr-monitor.py" "requirements.txt" "config.yaml")
+MISSING_FILES=()
+
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "$SOURCE_DIR/$file" ]; then
+        MISSING_FILES+=("$file")
+    fi
+done
+
+if [ ${#MISSING_FILES[@]} -ne 0 ]; then
+    echo "❌ Fichiers manquants dans $SOURCE_DIR :"
+    printf "   - %s\n" "${MISSING_FILES[@]}"
+    echo ""
+    echo "💡 Assurez-vous d'exécuter ce script depuis le répertoire contenant les fichiers du projet."
+    echo "   Exemple : cd /path/to/Arr-Monitor && ./install-arr.sh"
+    exit 1
 fi
 
-# Copie des fichiers depuis le répertoire source
-SOURCE_DIR="$(dirname "$0")"
-echo "📋 Copie des fichiers depuis $SOURCE_DIR..."
+# Création du répertoire d'installation
+IS_UPDATE=false
+if [ -d "$INSTALL_DIR" ]; then
+    echo "📂 Installation existante détectée. Mode mise à jour activé."
+    IS_UPDATE=true
+    
+    # Sauvegarde de la configuration existante si elle existe
+    if [ -f "$INSTALL_DIR/config/config.yaml.local" ]; then
+        BACKUP_FILE="$INSTALL_DIR/config/config.yaml.local.backup.$(date +%Y%m%d_%H%M%S)"
+        echo "💾 Sauvegarde de la configuration : $(basename "$BACKUP_FILE")"
+        cp "$INSTALL_DIR/config/config.yaml.local" "$BACKUP_FILE"
+    fi
+else
+    echo "📥 Nouvelle installation..."
+    mkdir -p "$INSTALL_DIR"
+fi
 
+# Maintenant on peut changer de répertoire
+cd "$INSTALL_DIR"
+
+# Copie des fichiers depuis le répertoire source
+echo "📋 Copie des fichiers depuis $SOURCE_DIR vers $INSTALL_DIR..."
 cp "$SOURCE_DIR/arr-monitor.py" ./
 cp "$SOURCE_DIR/requirements.txt" ./
-cp -r "$SOURCE_DIR/config" ./
+
+# Création du répertoire config et copie
+mkdir -p config
+cp "$SOURCE_DIR/config.yaml" config/
 
 # Création de l'environnement virtuel
 echo "🐍 Création de l'environnement virtuel Python..."
@@ -61,7 +113,15 @@ mkdir -p logs
 if [ ! -f "config/config.yaml.local" ]; then
     echo "⚙️  Création de la configuration locale..."
     cp config/config.yaml config/config.yaml.local
-    
+    CONFIG_CREATED=true
+else
+    echo "✅ Configuration locale existante trouvée"
+    echo "💡 La configuration existante a été préservée"
+    CONFIG_CREATED=false
+fi
+
+# Configuration interactive seulement si nouveau fichier créé
+if [ "$CONFIG_CREATED" = true ]; then
     echo ""
     echo "📋 Configuration des applications :"
     
@@ -139,7 +199,8 @@ if [ ! -f "config/config.yaml.local" ]; then
     
     echo "✅ Configuration créée dans config/config.yaml.local"
 else
-    echo "✅ Configuration locale existante trouvée"
+    echo "✅ Configuration locale existante préservée"
+    echo "💡 Pour reconfigurer, supprimez config/config.yaml.local et relancez l'installation"
 fi
 
 # Test de l'installation
@@ -153,7 +214,12 @@ else
 fi
 
 echo ""
-echo "✅ Installation terminée avec succès !"
+if [ "$IS_UPDATE" = true ]; then
+    echo "✅ Mise à jour terminée avec succès !"
+    echo "💡 Votre configuration existante a été préservée"
+else
+    echo "✅ Installation terminée avec succès !"
+fi
 echo ""
 echo "📋 Utilisation :"
 echo "   cd $INSTALL_DIR"
@@ -177,25 +243,57 @@ echo "📁 Configuration : $INSTALL_DIR/config/config.yaml.local"
 echo "📝 Logs : $INSTALL_DIR/logs/arr-monitor.log"
 echo ""
 echo "🔧 Pour créer un service système (optionnel) :"
-echo "   # Créer le fichier service"
-echo "   sudo tee /etc/systemd/system/arr-monitor.service > /dev/null <<EOF"
-echo "[Unit]"
-echo "Description=Arr Monitor - Surveillance Sonarr/Radarr"
-echo "After=network.target"
 echo ""
-echo "[Service]"
-echo "Type=simple"
-echo "User=$USER"
-echo "WorkingDirectory=$INSTALL_DIR"
-echo "ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/arr-monitor.py --config $INSTALL_DIR/config/config.yaml.local"
-echo "Restart=always"
-echo "RestartSec=30"
-echo ""
-echo "[Install]"
-echo "WantedBy=multi-user.target"
-echo "EOF"
-echo ""
-echo "   # Activer et démarrer le service"
-echo "   sudo systemctl enable arr-monitor"
-echo "   sudo systemctl start arr-monitor"
-echo "   sudo systemctl status arr-monitor"
+read -p "🛠️  Voulez-vous installer le service systemd ? [y/N] : " INSTALL_SERVICE
+INSTALL_SERVICE=${INSTALL_SERVICE:-N}
+
+if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
+    if [ -f "$SOURCE_DIR/arr-monitor.service" ]; then
+        echo "📋 Installation du service systemd..."
+        
+        # Copie et modification du fichier service
+        cp "$SOURCE_DIR/arr-monitor.service" arr-monitor.service.tmp
+        sed -i.bak "s|%USER%|$USER|g" arr-monitor.service.tmp
+        sed -i.bak2 "s|%INSTALL_DIR%|$INSTALL_DIR|g" arr-monitor.service.tmp
+        
+        # Installation du service
+        sudo cp arr-monitor.service.tmp /etc/systemd/system/arr-monitor.service
+        sudo systemctl daemon-reload
+        sudo systemctl enable arr-monitor
+        
+        # Nettoyer les fichiers temporaires
+        rm -f arr-monitor.service.tmp*
+        
+        echo "✅ Service systemd installé et activé"
+        echo "   sudo systemctl start arr-monitor    # Démarrer"
+        echo "   sudo systemctl status arr-monitor   # Vérifier le statut"
+        echo "   sudo journalctl -u arr-monitor -f   # Voir les logs"
+    else
+        echo "⚠️  Fichier service non trouvé : $SOURCE_DIR/arr-monitor.service"
+    fi
+else
+    echo "📋 Instructions pour installation manuelle du service :"
+    echo "   # Créer le fichier service"
+    echo "   sudo tee /etc/systemd/system/arr-monitor.service > /dev/null <<EOF"
+    echo "[Unit]"
+    echo "Description=Arr Monitor - Surveillance Sonarr/Radarr"
+    echo "After=network.target"
+    echo ""
+    echo "[Service]"
+    echo "Type=simple"
+    echo "User=$USER"
+    echo "WorkingDirectory=$INSTALL_DIR"
+    echo "ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/arr-monitor.py --config $INSTALL_DIR/config/config.yaml.local"
+    echo "Restart=always"
+    echo "RestartSec=30"
+    echo ""
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+    echo "EOF"
+    echo ""
+    echo "   # Activer et démarrer le service"
+    echo "   sudo systemctl daemon-reload"
+    echo "   sudo systemctl enable arr-monitor"
+    echo "   sudo systemctl start arr-monitor"
+    echo "   sudo systemctl status arr-monitor"
+fi

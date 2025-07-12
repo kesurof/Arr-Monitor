@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=USER_TO_REPLACE
-WorkingDirectory=INSTALL_DIR_TO_REPLACE
-ExecStart=INSTALL_DIR_TO_REPLACE/venv/bin/python INSTALL_DIR_TO_REPLACE/arr-monitor.py --config INSTALL_DIR_TO_REPLACE/config/config.yaml.local
+User=%USER%
+WorkingDirectory=%INSTALL_DIR%
+ExecStart=%INSTALL_DIR%/venv/bin/python %INSTALL_DIR%/arr-monitor.py --config %INSTALL_DIR%/config/config.yaml.local
 Restart=always
 RestartSec=30
 
