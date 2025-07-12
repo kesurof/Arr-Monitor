@@ -596,5 +596,46 @@ fi
 
 echo ""
 echo "🎉 Installation terminée !"
+
+# Proposer de supprimer le répertoire source après installation réussie
+if [ "$IS_UPDATE" = false ] && [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
+    echo ""
+    echo "🗑️  Nettoyage du répertoire source :"
+    echo "   Source : $SOURCE_DIR"
+    echo "   Destination : $INSTALL_DIR"
+    echo ""
+    read -p "🧹 Voulez-vous supprimer le répertoire source maintenant ? [y/N] : " DELETE_SOURCE
+    DELETE_SOURCE=${DELETE_SOURCE:-N}
+    
+    if [[ $DELETE_SOURCE =~ ^[Yy]$ ]]; then
+        echo "🗑️  Suppression du répertoire source..."
+        
+        # Vérification de sécurité - s'assurer qu'on ne supprime pas un répertoire système
+        case "$SOURCE_DIR" in
+            /|/home|/usr|/etc|/var|/opt|/bin|/sbin|/lib|/lib64)
+                echo "❌ Refus de supprimer un répertoire système : $SOURCE_DIR"
+                ;;
+            /home/$USER)
+                echo "❌ Refus de supprimer le répertoire home de l'utilisateur : $SOURCE_DIR"
+                ;;
+            *)
+                # Vérification supplémentaire que le répertoire contient bien les fichiers du projet
+                if [ -f "$SOURCE_DIR/arr-monitor.py" ] && [ -f "$SOURCE_DIR/install-arr.sh" ]; then
+                    echo "🗑️  Suppression de $SOURCE_DIR..."
+                    rm -rf "$SOURCE_DIR"
+                    echo "✅ Répertoire source supprimé avec succès"
+                    echo "💡 Les fichiers sont maintenant uniquement dans : $INSTALL_DIR"
+                else
+                    echo "❌ Répertoire source ne semble pas contenir les fichiers attendus"
+                    echo "💡 Suppression annulée par sécurité"
+                fi
+                ;;
+        esac
+    else
+        echo "📁 Répertoire source conservé : $SOURCE_DIR"
+        echo "💡 Vous pouvez le supprimer manuellement plus tard avec : rm -rf \"$SOURCE_DIR\""
+    fi
+fi
+
 echo ""
 echo "📖 Consultez le README.md pour plus d'informations et la documentation complète"
