@@ -3,6 +3,19 @@
 # Script d'installation Arr Monitor (Surveillance Sonarr/Radarr)
 set -euo pipefail
 
+# Gestion des paramètres
+FORCE_INSTALL=false
+for arg in "$@"; do
+    case $arg in
+        --update)
+            FORCE_INSTALL=true
+            shift
+            ;;
+        *)
+            ;;
+    esac
+done
+
 echo "🚀 Installation Arr Monitor - Surveillance Sonarr/Radarr"
 echo ""
 echo "📂 Ce script va :"
@@ -30,7 +43,13 @@ fi
 
 # Demander l'emplacement pour l'installation
 echo ""
-read -p "📁 Répertoire d'installation des scripts [/home/$USER/scripts] : " SCRIPTS_DIR
+if [ "$FORCE_INSTALL" = true ]; then
+    # Mode non-interactif pour --update
+    SCRIPTS_DIR="/home/$USER/scripts"
+    echo "📁 Mode mise à jour : utilisation du répertoire par défaut"
+else
+    read -p "📁 Répertoire d'installation des scripts [/home/$USER/scripts] : " SCRIPTS_DIR
+fi
 SCRIPTS_DIR=${SCRIPTS_DIR:-/home/$USER/scripts}
 
 # Répertoire d'installation final
@@ -463,7 +482,13 @@ echo "📝 Logs : $INSTALL_DIR/logs/arr-monitor.log"
 echo ""
 echo "🔧 Pour créer un service système (optionnel) :"
 echo ""
-read -p "🛠️  Voulez-vous installer le service systemd ? [y/N] : " INSTALL_SERVICE
+if [ "$FORCE_INSTALL" = true ]; then
+    # Mode non-interactif pour --update - ne pas installer le service automatiquement
+    INSTALL_SERVICE="N"
+    echo "📋 Mode mise à jour : service systemd non modifié"
+else
+    read -p "🛠️  Voulez-vous installer le service systemd ? [y/N] : " INSTALL_SERVICE
+fi
 INSTALL_SERVICE=${INSTALL_SERVICE:-N}
 
 if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
