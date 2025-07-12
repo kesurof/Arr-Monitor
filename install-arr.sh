@@ -660,6 +660,23 @@ fi
 echo ""
 echo "🎉 Installation terminée !"
 
+# Configuration des commandes bashrc
+setup_bashrc_function
+
+echo ""
+echo "🚀 Arr Monitor est maintenant installé et prêt !"
+echo ""
+echo "🎯 Commandes disponibles :"
+echo "   arr-monitor                    # Menu principal"
+echo "   arr-monitor start              # Démarrer le monitoring"
+echo "   arr-monitor test               # Test debug"
+echo "   arr-monitor logs               # Logs temps réel"
+echo "   arr-monitor help               # Aide complète"
+echo ""
+echo "🔗 Alias disponibles : 'arrmonitor' et 'arr'"
+echo ""
+echo "💡 Rechargez votre terminal avec : source ~/.bashrc"
+
 # Proposer de supprimer le répertoire source après installation réussie
 if [ "$IS_UPDATE" = false ] && [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
     echo ""
@@ -702,3 +719,119 @@ fi
 
 echo ""
 echo "📖 Consultez le README.md pour plus d'informations et la documentation complète"
+
+# Fonction pour ajouter la fonction arr-monitor au bashrc
+setup_bashrc_function() {
+    local bashrc_file="$HOME/.bashrc"
+    local function_name="arr-monitor"
+    local script_path="$(pwd)"
+    
+    echo "🔧 Configuration de la fonction bashrc '$function_name'..."
+    
+    # Vérifier si la fonction existe déjà
+    if grep -q "function $function_name" "$bashrc_file" 2>/dev/null; then
+        echo "📝 Mise à jour de la fonction existante dans $bashrc_file"
+        
+        # Supprimer l'ancienne fonction
+        sed -i '/^# Arr Monitor function$/,/^}$/d' "$bashrc_file" 2>/dev/null || true
+    else
+        echo "📝 Ajout de la nouvelle fonction dans $bashrc_file"
+    fi
+    
+    # Ajouter la nouvelle fonction
+    cat >> "$bashrc_file" << EOF
+
+# Arr Monitor function
+function $function_name() {
+    local current_dir="\$(pwd)"
+    cd "$script_path"
+    
+    case "\${1:-menu}" in
+        "start"|"run")
+            echo "🚀 Démarrage Arr Monitor..."
+            ./arr-launcher.sh
+            ;;
+        "test")
+            echo "🧪 Test Arr Monitor..."
+            source venv/bin/activate
+            python3 arr-monitor.py --test --debug
+            ;;
+        "status")
+            echo "📊 État du système..."
+            ./arr-launcher.sh
+            # Force le menu à afficher le status
+            ;;
+        "config")
+            echo "⚙️ Configuration Arr Monitor..."
+            if command -v nano &> /dev/null; then
+                nano config/config.yaml
+            elif command -v vim &> /dev/null; then
+                vim config/config.yaml
+            else
+                echo "Éditez manuellement: $script_path/config/config.yaml"
+            fi
+            ;;
+        "logs")
+            echo "📋 Logs Arr Monitor..."
+            if [[ -f "$script_path/logs/arr-monitor.log" ]]; then
+                tail -f "$script_path/logs/arr-monitor.log"
+            else
+                echo "❌ Aucun fichier de log trouvé"
+            fi
+            ;;
+        "update")
+            echo "🔍 Vérification des mises à jour..."
+            source venv/bin/activate
+            python3 update_checker.py
+            ;;
+        "menu")
+            echo "🎯 Menu Arr Monitor..."
+            ./arr-launcher.sh
+            ;;
+        "help"|"--help"|"-h")
+            echo ""
+            echo "🚀 Arr Monitor - Commandes disponibles:"
+            echo ""
+            echo "  $function_name [commande]"
+            echo ""
+            echo "Commandes:"
+            echo "  start, run    - Démarrer le monitoring (menu interactif)"
+            echo "  test          - Exécuter un test unique"
+            echo "  status        - Afficher l'état du système"
+            echo "  config        - Éditer la configuration"
+            echo "  logs          - Voir les logs en temps réel"
+            echo "  update        - Vérifier les mises à jour"
+            echo "  menu          - Afficher le menu principal (défaut)"
+            echo "  help          - Afficher cette aide"
+            echo ""
+            echo "Exemples:"
+            echo "  $function_name              # Menu principal"
+            echo "  $function_name start        # Démarrage monitoring"
+            echo "  $function_name test         # Test debug"
+            echo "  $function_name logs         # Logs temps réel"
+            echo ""
+            ;;
+        *)
+            echo "❌ Commande inconnue: \$1"
+            echo "💡 Utilisez '$function_name help' pour voir les commandes disponibles"
+            ;;
+    esac
+    
+    cd "\$current_dir"
+}
+
+# Alias pour compatibilité
+alias arrmonitor='$function_name'
+alias arr='$function_name'
+EOF
+
+    echo "✅ Fonction '$function_name' ajoutée au bashrc"
+    echo "💡 Utilisez les commandes suivantes après 'source ~/.bashrc' :"
+    echo "   • $function_name          # Menu principal"
+    echo "   • $function_name start    # Démarrage monitoring"
+    echo "   • $function_name test     # Test debug"
+    echo "   • $function_name logs     # Logs temps réel"
+    echo "   • $function_name help     # Aide complète"
+    echo ""
+    echo "🔗 Alias disponibles : 'arrmonitor' et 'arr'"
+}

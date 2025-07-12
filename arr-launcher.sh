@@ -173,6 +173,118 @@ cleanup_logs() {
     done
 }
 
+# Configuration de la fonction bashrc
+setup_bashrc_integration() {
+    info "🔧 Configuration de l'intégration bashrc..."
+    
+    local bashrc_file="$HOME/.bashrc"
+    local function_name="arr-monitor"
+    
+    # Vérifier si la fonction existe déjà
+    if grep -q "function $function_name" "$bashrc_file" 2>/dev/null; then
+        log "✅ Fonction bashrc '$function_name' déjà configurée"
+        return 0
+    fi
+    
+    echo ""
+    echo -e "${CYAN}🎯 Intégration bashrc disponible${NC}"
+    echo ""
+    echo "Cette option ajoutera une fonction '$function_name' à votre bashrc"
+    echo "permettant de lancer Arr Monitor depuis n'importe où avec :"
+    echo ""
+    echo -e "${GREEN}  $function_name         ${NC}# Menu principal"
+    echo -e "${GREEN}  $function_name start   ${NC}# Démarrage monitoring"
+    echo -e "${GREEN}  $function_name test    ${NC}# Test debug"
+    echo -e "${GREEN}  $function_name logs    ${NC}# Logs temps réel"
+    echo ""
+    echo -ne "${YELLOW}Voulez-vous configurer cette intégration ? [Y/n]:${NC} "
+    read -r configure_bashrc
+    configure_bashrc=${configure_bashrc:-Y}
+    
+    if [[ $configure_bashrc =~ ^[Yy]$ ]]; then
+        # Ajouter la fonction au bashrc
+        cat >> "$bashrc_file" << EOF
+
+# Arr Monitor function
+function $function_name() {
+    local current_dir="\$(pwd)"
+    cd "$SCRIPT_DIR"
+    
+    case "\${1:-menu}" in
+        "start"|"run")
+            echo "🚀 Démarrage Arr Monitor..."
+            ./arr-launcher.sh
+            ;;
+        "test")
+            echo "🧪 Test Arr Monitor..."
+            source venv/bin/activate
+            python3 arr-monitor.py --test --debug
+            ;;
+        "config")
+            echo "⚙️ Configuration Arr Monitor..."
+            if command -v nano &> /dev/null; then
+                nano config/config.yaml
+            elif command -v vim &> /dev/null; then
+                vim config/config.yaml
+            else
+                echo "Éditez manuellement: $SCRIPT_DIR/config/config.yaml"
+            fi
+            ;;
+        "logs")
+            echo "📋 Logs Arr Monitor..."
+            if [[ -f "$SCRIPT_DIR/logs/arr-monitor.log" ]]; then
+                tail -f "$SCRIPT_DIR/logs/arr-monitor.log"
+            else
+                echo "❌ Aucun fichier de log trouvé"
+            fi
+            ;;
+        "update")
+            echo "🔍 Vérification des mises à jour..."
+            source venv/bin/activate
+            python3 update_checker.py
+            ;;
+        "menu")
+            echo "🎯 Menu Arr Monitor..."
+            ./arr-launcher.sh
+            ;;
+        "help"|"--help"|"-h")
+            echo ""
+            echo "🚀 Arr Monitor - Commandes disponibles:"
+            echo ""
+            echo "  $function_name [commande]"
+            echo ""
+            echo "Commandes:"
+            echo "  start, run    - Démarrer le monitoring (menu interactif)"
+            echo "  test          - Exécuter un test unique"
+            echo "  config        - Éditer la configuration"
+            echo "  logs          - Voir les logs en temps réel"
+            echo "  update        - Vérifier les mises à jour"
+            echo "  menu          - Afficher le menu principal (défaut)"
+            echo "  help          - Afficher cette aide"
+            echo ""
+            ;;
+        *)
+            echo "❌ Commande inconnue: \$1"
+            echo "💡 Utilisez '$function_name help' pour voir les commandes disponibles"
+            ;;
+    esac
+    
+    cd "\$current_dir"
+}
+
+# Alias pour compatibilité
+alias arrmonitor='$function_name'
+alias arr='$function_name'
+EOF
+        
+        log "✅ Fonction '$function_name' ajoutée au bashrc"
+        info "💡 Rechargez votre terminal avec : source ~/.bashrc"
+        info "🎯 Puis utilisez : $function_name help"
+    else
+        info "⏭️ Intégration bashrc ignorée"
+    fi
+}
+
 # Menu principal
 show_menu() {
     clear
@@ -191,9 +303,10 @@ show_menu() {
     echo -e "${BLUE}6)${NC} 🧹 Nettoyer les logs"
     echo -e "${BLUE}7)${NC} 📋 Voir les logs en temps réel"
     echo -e "${BLUE}8)${NC} 🛠️  Installation/Configuration systemd"
-    echo -e "${BLUE}9)${NC} ❌ Quitter"
+    echo -e "${BLUE}9)${NC} 🎯 Configurer les commandes bashrc"
+    echo -e "${BLUE}0)${NC} ❌ Quitter"
     echo ""
-    echo -ne "${GREEN}Votre choix [1-9]:${NC} "
+    echo -ne "${GREEN}Votre choix [0-9]:${NC} "
 }
 
 # Lancement du monitoring
@@ -341,11 +454,15 @@ main() {
                 install_systemd
                 ;;
             9)
+                setup_bashrc_integration
+                read -p "Appuyez sur Entrée pour continuer..."
+                ;;
+            0)
                 log "👋 Au revoir !"
                 exit 0
                 ;;
             *)
-                error "Choix invalide. Veuillez sélectionner 1-9."
+                error "Choix invalide. Veuillez sélectionner 0-9."
                 sleep 2
                 ;;
         esac
