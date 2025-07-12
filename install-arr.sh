@@ -34,7 +34,7 @@ read -p "📁 Répertoire d'installation des scripts [/home/$USER/scripts] : " S
 SCRIPTS_DIR=${SCRIPTS_DIR:-/home/$USER/scripts}
 
 # Répertoire d'installation final
-INSTALL_DIR="$SCRIPTS_DIR/arr-monitor"
+INSTALL_DIR="$SCRIPTS_DIR/Arr-Monitor"
 echo "📁 Installation dans : $INSTALL_DIR"
 
 # Déterminer le répertoire source AVANT de changer de répertoire
