@@ -3,10 +3,6 @@
 # Script d'installation Arr Monitor (Surveillance Sonarr/Radarr)
 set -euo pipefail
 
-# Configuration du projet
-GITHUB_REPO="kesurof/Arr-Monitor"
-GITHUB_RAW_URL="https://raw.githubusercontent.com/$GITHUB_REPO/main"
-
 # Gestion des paramètres
 FORCE_INSTALL=false
 for arg in "$@"; do
@@ -23,13 +19,15 @@ done
 echo "🚀 Installation Arr Monitor - Surveillance Sonarr/Radarr"
 echo ""
 echo "📂 Ce script va :"
-echo "   • Télécharger les fichiers depuis GitHub"
+echo "   • Copier les fichiers depuis le répertoire courant"
 echo "   • Les installer dans un répertoire de destination"
 echo "   • Créer un environnement Python virtuel"
 echo "   • Configurer l'application de manière interactive"
 echo ""
-echo "💡 Utilisation :"
-echo "   curl -sL https://raw.githubusercontent.com/$GITHUB_REPO/main/install-arr.sh | bash"
+echo "💡 Utilisation typique :"
+echo "   git clone https://github.com/kesurof/Arr-Monitor.git"
+echo "   cd Arr-Monitor"
+echo "   ./install-arr.sh"
 echo ""
 
 # Vérification des prérequis
@@ -43,10 +41,19 @@ if ! command -v pip3 &> /dev/null; then
     exit 1
 fi
 
-if ! command -v curl &> /dev/null; then
-    echo "❌ curl n'est pas installé. Veuillez l'installer avant de continuer."
+# Vérification que nous sommes dans le bon répertoire
+if [ ! -f "arr-monitor.py" ] || [ ! -f "requirements.txt" ] || [ ! -f "config.yaml" ]; then
+    echo "❌ Fichiers manquants dans $(pwd) :"
+    [ ! -f "arr-monitor.py" ] && echo "   - arr-monitor.py"
+    [ ! -f "requirements.txt" ] && echo "   - requirements.txt"
+    [ ! -f "config.yaml" ] && echo "   - config.yaml"
+    echo ""
+    echo "💡 Assurez-vous d'exécuter ce script depuis le répertoire contenant les fichiers du projet."
+    echo "   Exemple : cd /path/to/Arr-Monitor && ./install-arr.sh"
     exit 1
 fi
+
+SOURCE_DIR="$(pwd)"
 
 # Demander l'emplacement pour l'installation
 echo ""
@@ -62,19 +69,6 @@ SCRIPTS_DIR=${SCRIPTS_DIR:-/home/$USER/scripts}
 # Répertoire d'installation final
 INSTALL_DIR="$SCRIPTS_DIR/Arr-Monitor"
 echo "📁 Installation dans : $INSTALL_DIR"
-
-# Déterminer le mode d'installation
-INSTALL_MODE=""
-if [ -f "$(pwd)/arr-monitor.py" ] && [ -f "$(pwd)/requirements.txt" ] && [ -f "$(pwd)/config.yaml" ]; then
-    # Mode local : fichiers présents dans le répertoire courant
-    SOURCE_DIR="$(pwd)"
-    INSTALL_MODE="local"
-    echo "📋 Mode installation : LOCAL (fichiers détectés dans $(pwd))"
-else
-    # Mode distant : téléchargement depuis GitHub
-    INSTALL_MODE="remote"
-    echo "📋 Mode installation : DISTANT (téléchargement depuis GitHub)"
-fi
 
 # Création du répertoire d'installation
 IS_UPDATE=false
@@ -96,49 +90,21 @@ fi
 # Maintenant on peut changer de répertoire
 cd "$INSTALL_DIR"
 
-# Téléchargement ou copie des fichiers
-if [ "$INSTALL_MODE" = "remote" ]; then
-    echo "📥 Téléchargement des fichiers depuis GitHub..."
-    
-    # Télécharger les fichiers principaux
-    echo "  📄 Téléchargement de arr-monitor.py..."
-    curl -sL "$GITHUB_RAW_URL/arr-monitor.py" -o arr-monitor.py
-    
-    echo "  📄 Téléchargement de requirements.txt..."
-    curl -sL "$GITHUB_RAW_URL/requirements.txt" -o requirements.txt
-    
-    echo "  📄 Téléchargement de config.yaml..."
-    curl -sL "$GITHUB_RAW_URL/config.yaml" -o config.yaml.tmp
-    
-    echo "  📄 Téléchargement de arr-monitor.service..."
-    curl -sL "$GITHUB_RAW_URL/arr-monitor.service" -o arr-monitor.service.tmp
-    
-    # Vérifier que les téléchargements ont réussi
-    if [ ! -f "arr-monitor.py" ] || [ ! -f "requirements.txt" ] || [ ! -f "config.yaml.tmp" ]; then
-        echo "❌ Erreur lors du téléchargement des fichiers depuis GitHub"
-        echo "� Vérifiez votre connexion internet et réessayez"
-        exit 1
-    fi
-    
-    # Créer le répertoire config et déplacer le fichier
-    mkdir -p config
-    mv config.yaml.tmp config/config.yaml
-    
-    echo "✅ Fichiers téléchargés avec succès"
-else
-    echo "�📋 Copie des fichiers depuis $SOURCE_DIR vers $INSTALL_DIR..."
-    cp "$SOURCE_DIR/arr-monitor.py" ./
-    cp "$SOURCE_DIR/requirements.txt" ./
-    
-    # Création du répertoire config et copie
-    mkdir -p config
-    cp "$SOURCE_DIR/config.yaml" config/
-    
-    # Copier le fichier service pour installation locale
-    if [ -f "$SOURCE_DIR/arr-monitor.service" ]; then
-        cp "$SOURCE_DIR/arr-monitor.service" arr-monitor.service.tmp
-    fi
+# Copie des fichiers depuis le répertoire source
+echo "📋 Copie des fichiers depuis $SOURCE_DIR vers $INSTALL_DIR..."
+cp "$SOURCE_DIR/arr-monitor.py" ./
+cp "$SOURCE_DIR/requirements.txt" ./
+
+# Création du répertoire config et copie
+mkdir -p config
+cp "$SOURCE_DIR/config.yaml" config/
+
+# Copier le fichier service pour installation
+if [ -f "$SOURCE_DIR/arr-monitor.service" ]; then
+    cp "$SOURCE_DIR/arr-monitor.service" arr-monitor.service.tmp
 fi
+
+echo "✅ Fichiers copiés avec succès"
 
 # Application automatique de la correction du bug get_queue si nécessaire
 echo "🔧 Vérification et correction du code Python..."
@@ -174,287 +140,196 @@ echo "🐍 Gestion de l'environnement virtuel Python..."
 # Vérifier si un venv est déjà actif et contient les dépendances nécessaires
 EXISTING_VENV=""
 if [ -n "$VIRTUAL_ENV" ] && [ -f "$VIRTUAL_ENV/bin/python" ]; then
-    echo "🔍 Environnement virtuel actif détecté: $VIRTUAL_ENV"
-    
-    # Vérifier si les dépendances sont disponibles
+    # Vérifier que les dépendances sont installées
     if "$VIRTUAL_ENV/bin/python" -c "import yaml, requests" &> /dev/null; then
+        echo "🔍 Environnement virtuel actif détecté: $VIRTUAL_ENV"
         echo "✅ Dépendances détectées dans l'environnement actif"
         EXISTING_VENV="$VIRTUAL_ENV"
     else
+        echo "🔍 Environnement virtuel actif détecté: $VIRTUAL_ENV"
         echo "⚠️  Dépendances manquantes dans l'environnement actif"
     fi
 fi
 
-# Vérifier la variable SETTINGS_SOURCE pour un venv existant
+# Vérifier si un venv seedbox-compose existe
 if [ -z "$EXISTING_VENV" ] && [ -n "$SETTINGS_SOURCE" ] && [ -f "$SETTINGS_SOURCE/venv/bin/python" ]; then
-    echo "🔍 Environnement virtuel détecté via SETTINGS_SOURCE: $SETTINGS_SOURCE/venv"
-    
+    # Vérifier que les dépendances sont installées
     if "$SETTINGS_SOURCE/venv/bin/python" -c "import yaml, requests" &> /dev/null; then
-        echo "✅ Dépendances détectées dans SETTINGS_SOURCE/venv"
+        echo "🔍 Environnement virtuel seedbox-compose détecté: $SETTINGS_SOURCE/venv"
+        echo "✅ Dépendances détectées dans l'environnement seedbox-compose"
         EXISTING_VENV="$SETTINGS_SOURCE/venv"
     else
-        echo "⚠️  Dépendances manquantes dans SETTINGS_SOURCE/venv"
+        echo "🔍 Environnement virtuel seedbox-compose détecté: $SETTINGS_SOURCE/venv"
+        echo "⚠️  Dépendances manquantes dans l'environnement seedbox-compose"
     fi
 fi
 
 if [ -n "$EXISTING_VENV" ]; then
     echo "🔗 Utilisation de l'environnement virtuel existant: $EXISTING_VENV"
     
-    # Créer un lien symbolique vers le venv existant
-    if [ -L "venv" ] || [ -d "venv" ]; then
-        rm -rf venv
-    fi
-    ln -sf "$EXISTING_VENV" venv
-    
-    echo "✅ Lien symbolique créé vers l'environnement existant"
-    
-    # Vérification finale des dépendances
-    if ! "$EXISTING_VENV/bin/python" -c "import yaml, requests" &> /dev/null; then
-        echo "📦 Installation des dépendances manquantes..."
-        "$EXISTING_VENV/bin/pip" install -r requirements.txt
+    # Vérifier si c'est un lien symbolique existant et s'il pointe au bon endroit
+    if [ -L "venv" ]; then
+        CURRENT_TARGET=$(readlink "venv")
+        if [ "$CURRENT_TARGET" != "$EXISTING_VENV" ]; then
+            echo "🔗 Mise à jour du lien symbolique venv"
+            rm venv
+            ln -sf "$EXISTING_VENV" venv
+        else
+            echo "✅ Lien symbolique venv déjà correct"
+        fi
+    else
+        # Supprimer l'ancien venv s'il existe et créer le lien
+        [ -d "venv" ] && rm -rf venv
+        ln -sf "$EXISTING_VENV" venv
+        echo "✅ Lien symbolique créé vers l'environnement existant"
     fi
 else
-    echo "🐍 Création d'un nouvel environnement virtuel..."
-    if [ ! -d "venv" ] || [ -L "venv" ]; then
-        rm -rf venv
-        python3 -m venv venv
-    fi
+    echo "📦 Création d'un nouvel environnement virtuel..."
     
-    # Activation de l'environnement virtuel
-    echo "⚡ Activation de l'environnement virtuel..."
+    # Supprimer l'ancien environnement s'il existe
+    [ -e "venv" ] && rm -rf venv
+    
+    # Créer le nouvel environnement
+    python3 -m venv venv
+    
+    # Activer et installer les dépendances
     source venv/bin/activate
-    
-    # Installation des dépendances
-    echo "📦 Installation des dépendances Python..."
+    echo "📦 Installation des dépendances..."
     pip install --upgrade pip
     pip install -r requirements.txt
+    
+    echo "✅ Environnement virtuel créé et configuré"
 fi
 
-# Création des répertoires
+# Créer les répertoires nécessaires
 echo "📁 Création des répertoires..."
 mkdir -p logs
 
-# Configuration
+# Configuration interactive seulement si nouveau fichier créé
+CONFIG_CREATED=false
 if [ ! -f "config/config.yaml.local" ]; then
-    echo "⚙️  Création de la configuration locale..."
     cp config/config.yaml config/config.yaml.local
     CONFIG_CREATED=true
 else
-    echo "✅ Configuration locale existante trouvée"
-    echo "💡 La configuration existante a été préservée"
     CONFIG_CREATED=false
 fi
 
-# Fonction de détection automatique des conteneurs
+# Fonctions de détection
 detect_containers() {
-    echo "🔍 Détection automatique des conteneurs..."
-    
-    # Variables globales pour la détection
     SONARR_DETECTED=""
     RADARR_DETECTED=""
     
-    if command -v docker &> /dev/null && docker ps &> /dev/null; then
-        # Recherche conteneur Sonarr
-        SONARR_CONTAINERS=$(docker ps --format "{{.Names}}" | grep -i sonarr)
-        if [ -n "$SONARR_CONTAINERS" ]; then
-            while read -r container; do
-                if [ -n "$container" ]; then
-                    # Méthode 1: Récupération IP du conteneur (réseau traefik_proxy)
-                    SONARR_IP=$(docker inspect "$container" --format='{{.NetworkSettings.Networks.traefik_proxy.IPAddress}}' 2>/dev/null)
-                    if [ -n "$SONARR_IP" ] && [ "$SONARR_IP" != "<no value>" ]; then
-                        SONARR_DETECTED="http://$SONARR_IP:8989"
-                        echo "  ✅ Sonarr détecté via IP container: $container -> $SONARR_DETECTED"
-                        break
-                    fi
-                    
-                    # Méthode 2: Récupération IP du réseau par défaut
-                    if [ -z "$SONARR_IP" ]; then
-                        SONARR_IP=$(docker inspect "$container" --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null | head -1)
-                        if [ -n "$SONARR_IP" ] && [ "$SONARR_IP" != "<no value>" ]; then
-                            SONARR_DETECTED="http://$SONARR_IP:8989"
-                            echo "  ✅ Sonarr détecté via IP réseau: $container -> $SONARR_DETECTED"
-                            break
-                        fi
-                    fi
-                    
-                    # Méthode 3: Port mapping (fallback)
-                    if [ -z "$SONARR_DETECTED" ]; then
-                        SONARR_PORT=$(docker port "$container" 8989/tcp 2>/dev/null | cut -d':' -f2)
-                        if [ -n "$SONARR_PORT" ]; then
-                            SONARR_DETECTED="http://localhost:$SONARR_PORT"
-                            echo "  ✅ Sonarr détecté via port mapping: $container -> $SONARR_DETECTED"
-                            break
-                        fi
-                    fi
+    echo "🔍 Détection automatique des conteneurs..."
+    
+    if command -v docker &> /dev/null; then
+        # Détecter Sonarr
+        if docker ps --format "table {{.Names}}" | grep -q "sonarr"; then
+            SONARR_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "sonarr" | head -1)
+            
+            # Méthode 1: Essayer réseau traefik_proxy
+            SONARR_IP=$(docker inspect $SONARR_CONTAINER --format='{{.NetworkSettings.Networks.traefik_proxy.IPAddress}}' 2>/dev/null | grep -v '^$' | head -1)
+            
+            # Méthode 2: Si pas de traefik_proxy, prendre la première IP disponible
+            if [ -z "$SONARR_IP" ]; then
+                SONARR_IP=$(docker inspect $SONARR_CONTAINER --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null | head -1)
+            fi
+            
+            # Méthode 3: Si toujours pas d'IP, utiliser le port mapping
+            if [ -z "$SONARR_IP" ]; then
+                SONARR_PORT=$(docker port $SONARR_CONTAINER 8989/tcp 2>/dev/null | cut -d: -f2)
+                if [ -n "$SONARR_PORT" ]; then
+                    SONARR_DETECTED="http://localhost:$SONARR_PORT"
+                    echo "  ✅ Sonarr détecté via port mapping: $SONARR_CONTAINER -> $SONARR_DETECTED"
                 fi
-            done <<< "$SONARR_CONTAINERS"
+            else
+                SONARR_DETECTED="http://$SONARR_IP:8989"
+                echo "  ✅ Sonarr détecté via IP container: $SONARR_CONTAINER -> $SONARR_DETECTED"
+            fi
         fi
         
-        # Recherche conteneur Radarr (même logique)
-        RADARR_CONTAINERS=$(docker ps --format "{{.Names}}" | grep -i radarr)
-        if [ -n "$RADARR_CONTAINERS" ]; then
-            while read -r container; do
-                if [ -n "$container" ]; then
-                    # Méthode 1: Récupération IP du conteneur (réseau traefik_proxy)
-                    RADARR_IP=$(docker inspect "$container" --format='{{.NetworkSettings.Networks.traefik_proxy.IPAddress}}' 2>/dev/null)
-                    if [ -n "$RADARR_IP" ] && [ "$RADARR_IP" != "<no value>" ]; then
-                        RADARR_DETECTED="http://$RADARR_IP:7878"
-                        echo "  ✅ Radarr détecté via IP container: $container -> $RADARR_DETECTED"
-                        break
-                    fi
-                    
-                    # Méthode 2: Récupération IP du réseau par défaut
-                    if [ -z "$RADARR_IP" ]; then
-                        RADARR_IP=$(docker inspect "$container" --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null | head -1)
-                        if [ -n "$RADARR_IP" ] && [ "$RADARR_IP" != "<no value>" ]; then
-                            RADARR_DETECTED="http://$RADARR_IP:7878"
-                            echo "  ✅ Radarr détecté via IP réseau: $container -> $RADARR_DETECTED"
-                            break
-                        fi
-                    fi
-                    
-                    # Méthode 3: Port mapping (fallback)
-                    if [ -z "$RADARR_DETECTED" ]; then
-                        RADARR_PORT=$(docker port "$container" 7878/tcp 2>/dev/null | cut -d':' -f2)
-                        if [ -n "$RADARR_PORT" ]; then
-                            RADARR_DETECTED="http://localhost:$RADARR_PORT"
-                            echo "  ✅ Radarr détecté via port mapping: $container -> $RADARR_DETECTED"
-                            break
-                        fi
-                    fi
+        # Détecter Radarr (même logique)
+        if docker ps --format "table {{.Names}}" | grep -q "radarr"; then
+            RADARR_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "radarr" | head -1)
+            
+            # Méthode 1: Essayer réseau traefik_proxy
+            RADARR_IP=$(docker inspect $RADARR_CONTAINER --format='{{.NetworkSettings.Networks.traefik_proxy.IPAddress}}' 2>/dev/null | grep -v '^$' | head -1)
+            
+            # Méthode 2: Si pas de traefik_proxy, prendre la première IP disponible
+            if [ -z "$RADARR_IP" ]; then
+                RADARR_IP=$(docker inspect $RADARR_CONTAINER --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null | head -1)
+            fi
+            
+            # Méthode 3: Si toujours pas d'IP, utiliser le port mapping
+            if [ -z "$RADARR_IP" ]; then
+                RADARR_PORT=$(docker port $RADARR_CONTAINER 7878/tcp 2>/dev/null | cut -d: -f2)
+                if [ -n "$RADARR_PORT" ]; then
+                    RADARR_DETECTED="http://localhost:$RADARR_PORT"
+                    echo "  ✅ Radarr détecté via port mapping: $RADARR_CONTAINER -> $RADARR_DETECTED"
                 fi
-            done <<< "$RADARR_CONTAINERS"
+            else
+                RADARR_DETECTED="http://$RADARR_IP:7878"
+                echo "  ✅ Radarr détecté via IP container: $RADARR_CONTAINER -> $RADARR_DETECTED"
+            fi
         fi
-    fi
-    
-    # Vérification des processus locaux si Docker ne trouve rien
-    if [ -z "$SONARR_DETECTED" ]; then
-        if command -v netstat &> /dev/null && netstat -tlnp 2>/dev/null | grep -q ":8989 "; then
-            SONARR_DETECTED="http://localhost:8989"
-            echo "  ✅ Sonarr détecté (processus local): $SONARR_DETECTED"
-        elif command -v ss &> /dev/null && ss -tlnp 2>/dev/null | grep -q ":8989 "; then
-            SONARR_DETECTED="http://localhost:8989"
-            echo "  ✅ Sonarr détecté (processus local via ss): $SONARR_DETECTED"
+        
+        if [ -z "$SONARR_DETECTED" ] && [ -z "$RADARR_DETECTED" ]; then
+            echo "  ⚠️  Aucun conteneur Sonarr/Radarr détecté"
         fi
-    fi
-    
-    if [ -z "$RADARR_DETECTED" ]; then
-        if command -v netstat &> /dev/null && netstat -tlnp 2>/dev/null | grep -q ":7878 "; then
-            RADARR_DETECTED="http://localhost:7878"
-            echo "  ✅ Radarr détecté (processus local): $RADARR_DETECTED"
-        elif command -v ss &> /dev/null && ss -tlnp 2>/dev/null | grep -q ":7878 "; then
-            RADARR_DETECTED="http://localhost:7878"
-            echo "  ✅ Radarr détecté (processus local via ss): $RADARR_DETECTED"
-        fi
-    fi
-    
-    if [ -z "$SONARR_DETECTED" ] && [ -z "$RADARR_DETECTED" ]; then
-        echo "  ⚠️  Aucun conteneur/processus Sonarr/Radarr détecté automatiquement"
-        echo "  💡 Vérifiez que vos services sont démarrés et accessibles"
     fi
 }
 
-# Fonction pour détecter les clés API
 detect_api_keys() {
-    echo "🔑 Recherche des clés API..."
-    
-    # Variables globales pour la détection
     SONARR_API_DETECTED=""
     RADARR_API_DETECTED=""
     
-    # Recherche clé API Sonarr
-    if command -v docker &> /dev/null && docker ps &> /dev/null; then
-        SONARR_CONTAINERS=$(docker ps --format "{{.Names}}" | grep -i sonarr)
-        if [ -n "$SONARR_CONTAINERS" ]; then
-            while read -r container; do
-                if [ -n "$container" ]; then
-                    # Méthode 1: Via chemin SETTINGS_STORAGE (comme dans votre code)
-                    SETTINGS_STORAGE=${SETTINGS_STORAGE:-/opt/seedbox/docker}
-                    CURRENT_USER=${USER:-kesurof}
-                    CONFIG_PATH="$SETTINGS_STORAGE/docker/$CURRENT_USER/sonarr/config/config.xml"
-                    
-                    if [ -f "$CONFIG_PATH" ] && [ -r "$CONFIG_PATH" ]; then
-                        SONARR_API_DETECTED=$(sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' "$CONFIG_PATH" 2>/dev/null | head -1)
-                        if [ -n "$SONARR_API_DETECTED" ]; then
-                            echo "  🔑 Clé API Sonarr trouvée via SETTINGS_STORAGE: ${SONARR_API_DETECTED:0:8}..."
-                            break
-                        fi
-                    fi
-                    
-                    # Méthode 2: Via conteneur Docker (chemins standards)
-                    if [ -z "$SONARR_API_DETECTED" ]; then
-                        SONARR_API_DETECTED=$(docker exec "$container" sh -c 'cat /config/config.xml 2>/dev/null || cat /app/config.xml 2>/dev/null || cat /data/config.xml 2>/dev/null' | sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' | head -1 2>/dev/null)
-                        if [ -n "$SONARR_API_DETECTED" ]; then
-                            echo "  🔑 Clé API Sonarr détectée depuis conteneur $container: ${SONARR_API_DETECTED:0:8}..."
-                            break
-                        fi
-                    fi
-                fi
-            done <<< "$SONARR_CONTAINERS"
+    echo "🔑 Recherche des clés API..."
+    
+    # Fonction pour extraire la clé API depuis un fichier config.xml
+    extract_api_key() {
+        local config_file="$1"
+        if [ -f "$config_file" ]; then
+            grep -o '<ApiKey>[^<]*</ApiKey>' "$config_file" 2>/dev/null | sed 's/<ApiKey>\(.*\)<\/ApiKey>/\1/' | head -1
         fi
+    }
+    
+    # Chercher les clés API Sonarr
+    # Méthode 1: Via SETTINGS_STORAGE (structure seedbox)
+    if [ -n "$SETTINGS_STORAGE" ] && [ -f "$SETTINGS_STORAGE/docker/$USER/sonarr/config/config.xml" ]; then
+        SONARR_API_DETECTED=$(extract_api_key "$SETTINGS_STORAGE/docker/$USER/sonarr/config/config.xml")
+        [ -n "$SONARR_API_DETECTED" ] && echo "  🔑 Clé API Sonarr trouvée via SETTINGS_STORAGE: ${SONARR_API_DETECTED:0:8}..."
     fi
     
-    # Recherche clé API Radarr
-    if command -v docker &> /dev/null && docker ps &> /dev/null; then
-        RADARR_CONTAINERS=$(docker ps --format "{{.Names}}" | grep -i radarr)
-        if [ -n "$RADARR_CONTAINERS" ]; then
-            while read -r container; do
-                if [ -n "$container" ]; then
-                    # Méthode 1: Via chemin SETTINGS_STORAGE (comme dans votre code)
-                    SETTINGS_STORAGE=${SETTINGS_STORAGE:-/opt/seedbox/docker}
-                    CURRENT_USER=${USER:-kesurof}
-                    CONFIG_PATH="$SETTINGS_STORAGE/docker/$CURRENT_USER/radarr/config/config.xml"
-                    
-                    if [ -f "$CONFIG_PATH" ] && [ -r "$CONFIG_PATH" ]; then
-                        RADARR_API_DETECTED=$(sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' "$CONFIG_PATH" 2>/dev/null | head -1)
-                        if [ -n "$RADARR_API_DETECTED" ]; then
-                            echo "  🔑 Clé API Radarr trouvée via SETTINGS_STORAGE: ${RADARR_API_DETECTED:0:8}..."
-                            break
-                        fi
-                    fi
-                    
-                    # Méthode 2: Via conteneur Docker (chemins standards)
-                    if [ -z "$RADARR_API_DETECTED" ]; then
-                        RADARR_API_DETECTED=$(docker exec "$container" sh -c 'cat /config/config.xml 2>/dev/null || cat /app/config.xml 2>/dev/null || cat /data/config.xml 2>/dev/null' | sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' | head -1 2>/dev/null)
-                        if [ -n "$RADARR_API_DETECTED" ]; then
-                            echo "  🔑 Clé API Radarr détectée depuis conteneur $container: ${RADARR_API_DETECTED:0:8}..."
-                            break
-                        fi
-                    fi
-                fi
-            done <<< "$RADARR_CONTAINERS"
-        fi
+    # Méthode 2: Via conteneur Docker  
+    if [ -z "$SONARR_API_DETECTED" ] && command -v docker &> /dev/null && docker ps --format "table {{.Names}}" | grep -q "sonarr"; then
+        SONARR_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "sonarr" | head -1)
+        SONARR_API_DETECTED=$(docker exec "$SONARR_CONTAINER" cat /config/config.xml 2>/dev/null | grep -o '<ApiKey>[^<]*</ApiKey>' | sed 's/<ApiKey>\(.*\)<\/ApiKey>/\1/' | head -1)
+        [ -n "$SONARR_API_DETECTED" ] && echo "  🔑 Clé API Sonarr trouvée via conteneur: ${SONARR_API_DETECTED:0:8}..."
     fi
     
-    # Recherche dans les fichiers locaux communs (fallback)
-    if [ -z "$SONARR_API_DETECTED" ]; then
-        for config_path in "/home/$USER/.config/Sonarr/config.xml" "/opt/Sonarr/config.xml" "/var/lib/sonarr/config.xml" "/usr/local/share/sonarr/config.xml"; do
-            if [ -f "$config_path" ] && [ -r "$config_path" ]; then
-                SONARR_API_DETECTED=$(sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' "$config_path" 2>/dev/null | head -1)
-                if [ -n "$SONARR_API_DETECTED" ]; then
-                    echo "  🔑 Clé API Sonarr trouvée dans $config_path: ${SONARR_API_DETECTED:0:8}..."
-                    break
-                fi
-            fi
-        done
+    # Méthode 3: Fichiers locaux standards
+    if [ -z "$SONARR_API_DETECTED" ] && [ -f "/home/$USER/.config/Sonarr/config.xml" ]; then
+        SONARR_API_DETECTED=$(extract_api_key "/home/$USER/.config/Sonarr/config.xml")
+        [ -n "$SONARR_API_DETECTED" ] && echo "  🔑 Clé API Sonarr trouvée dans ~/.config: ${SONARR_API_DETECTED:0:8}..."
     fi
     
-    if [ -z "$RADARR_API_DETECTED" ]; then
-        for config_path in "/home/$USER/.config/Radarr/config.xml" "/opt/Radarr/config.xml" "/var/lib/radarr/config.xml" "/usr/local/share/radarr/config.xml"; do
-            if [ -f "$config_path" ] && [ -r "$config_path" ]; then
-                RADARR_API_DETECTED=$(sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' "$config_path" 2>/dev/null | head -1)
-                if [ -n "$RADARR_API_DETECTED" ]; then
-                    echo "  🔑 Clé API Radarr trouvée dans $config_path: ${RADARR_API_DETECTED:0:8}..."
-                    break
-                fi
-            fi
-        done
+    # Chercher les clés API Radarr (même logique)
+    # Méthode 1: Via SETTINGS_STORAGE
+    if [ -n "$SETTINGS_STORAGE" ] && [ -f "$SETTINGS_STORAGE/docker/$USER/radarr/config/config.xml" ]; then
+        RADARR_API_DETECTED=$(extract_api_key "$SETTINGS_STORAGE/docker/$USER/radarr/config/config.xml")
+        [ -n "$RADARR_API_DETECTED" ] && echo "  🔑 Clé API Radarr trouvée via SETTINGS_STORAGE: ${RADARR_API_DETECTED:0:8}..."
     fi
     
-    if [ -z "$SONARR_API_DETECTED" ] && [ -z "$RADARR_API_DETECTED" ]; then
-        echo "  ⚠️  Aucune clé API détectée automatiquement"
-        echo "  💡 Les clés API devront être saisies manuellement"
-        echo "  💡 Vérifiez les variables d'environnement SETTINGS_STORAGE si vous utilisez une structure personnalisée"
+    # Méthode 2: Via conteneur Docker
+    if [ -z "$RADARR_API_DETECTED" ] && command -v docker &> /dev/null && docker ps --format "table {{.Names}}" | grep -q "radarr"; then
+        RADARR_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "radarr" | head -1)
+        RADARR_API_DETECTED=$(docker exec "$RADARR_CONTAINER" cat /config/config.xml 2>/dev/null | grep -o '<ApiKey>[^<]*</ApiKey>' | sed 's/<ApiKey>\(.*\)<\/ApiKey>/\1/' | head -1)
+        [ -n "$RADARR_API_DETECTED" ] && echo "  🔑 Clé API Radarr trouvée via conteneur: ${RADARR_API_DETECTED:0:8}..."
+    fi
+    
+    # Méthode 3: Fichiers locaux standards
+    if [ -z "$RADARR_API_DETECTED" ] && [ -f "/home/$USER/.config/Radarr/config.xml" ]; then
+        RADARR_API_DETECTED=$(extract_api_key "/home/$USER/.config/Radarr/config.xml")
+        [ -n "$RADARR_API_DETECTED" ] && echo "  🔑 Clé API Radarr trouvée dans ~/.config: ${RADARR_API_DETECTED:0:8}..."
     fi
 }
 
@@ -478,20 +353,31 @@ if [ "$CONFIG_CREATED" = true ]; then
         SONARR_URL=${SONARR_URL:-$DEFAULT_SONARR_URL}
         
         if [ -n "$SONARR_API_DETECTED" ]; then
-            read -p "📺 Clé API Sonarr [Détectée: ${SONARR_API_DETECTED:0:8}...] : " SONARR_API
+            read -p "🔑 Clé API Sonarr [détectée automatiquement] : " SONARR_API
             SONARR_API=${SONARR_API:-$SONARR_API_DETECTED}
         else
-            read -p "📺 Clé API Sonarr : " SONARR_API
+            read -p "🔑 Clé API Sonarr : " SONARR_API
         fi
         
-        # Test de connexion Sonarr
-        if [ -n "$SONARR_API" ]; then
-            echo "🧪 Test de connexion Sonarr..."
-            if curl -s -H "X-Api-Key: $SONARR_API" "$SONARR_URL/api/v3/system/status" > /dev/null; then
-                echo "✅ Sonarr connecté avec succès"
-            else
-                echo "⚠️  Impossible de se connecter à Sonarr (vérifiez l'URL et la clé API)"
-            fi
+        # Test de connexion
+        echo "🧪 Test de connexion Sonarr..."
+        if python -c "
+import requests
+try:
+    response = requests.get('$SONARR_URL/api/v3/system/status', headers={'X-Api-Key': '$SONARR_API'}, timeout=5)
+    if response.status_code == 200:
+        print('✅ Connexion Sonarr réussie')
+        exit(0)
+    else:
+        print('⚠️  Réponse inattendue de Sonarr (code: {})'.format(response.status_code))
+        exit(1)
+except Exception as e:
+    print('⚠️  Impossible de se connecter à Sonarr (vérifiez l'\''URL et la clé API)')
+    exit(1)
+" 2>/dev/null; then
+            :
+        else
+            :
         fi
     fi
     
@@ -506,26 +392,37 @@ if [ "$CONFIG_CREATED" = true ]; then
         RADARR_URL=${RADARR_URL:-$DEFAULT_RADARR_URL}
         
         if [ -n "$RADARR_API_DETECTED" ]; then
-            read -p "🎬 Clé API Radarr [Détectée: ${RADARR_API_DETECTED:0:8}...] : " RADARR_API
+            read -p "🔑 Clé API Radarr [détectée automatiquement] : " RADARR_API
             RADARR_API=${RADARR_API:-$RADARR_API_DETECTED}
         else
-            read -p "🎬 Clé API Radarr : " RADARR_API
+            read -p "🔑 Clé API Radarr : " RADARR_API
         fi
         
-        # Test de connexion Radarr
-        if [ -n "$RADARR_API" ]; then
-            echo "🧪 Test de connexion Radarr..."
-            if curl -s -H "X-Api-Key: $RADARR_API" "$RADARR_URL/api/v3/system/status" > /dev/null; then
-                echo "✅ Radarr connecté avec succès"
-            else
-                echo "⚠️  Impossible de se connecter à Radarr (vérifiez l'URL et la clé API)"
-            fi
+        # Test de connexion
+        echo "🧪 Test de connexion Radarr..."
+        if python -c "
+import requests
+try:
+    response = requests.get('$RADARR_URL/api/v3/system/status', headers={'X-Api-Key': '$RADARR_API'}, timeout=5)
+    if response.status_code == 200:
+        print('✅ Connexion Radarr réussie')
+        exit(0)
+    else:
+        print('⚠️  Réponse inattendue de Radarr (code: {})'.format(response.status_code))
+        exit(1)
+except Exception as e:
+    print('⚠️  Impossible de se connecter à Radarr (vérifiez l'\''URL et la clé API)')
+    exit(1)
+" 2>/dev/null; then
+            :
+        else
+            :
         fi
     fi
     
     # Configuration des actions automatiques
     echo ""
-    read -p "🔄 Activer les actions automatiques (relance/suppression) ? [Y/n] : " AUTO_ACTIONS
+    read -p "🤖 Activer les actions automatiques (relance/suppression) ? [Y/n] : " AUTO_ACTIONS
     AUTO_ACTIONS=${AUTO_ACTIONS:-Y}
     
     # Mise à jour du fichier de configuration
@@ -615,13 +512,6 @@ if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
     SERVICE_FILE=""
     if [ -f "arr-monitor.service.tmp" ]; then
         SERVICE_FILE="arr-monitor.service.tmp"
-    elif [ "$INSTALL_MODE" = "remote" ]; then
-        # Télécharger le fichier service si pas encore fait
-        echo "📥 Téléchargement du fichier service systemd..."
-        curl -sL "$GITHUB_RAW_URL/arr-monitor.service" -o arr-monitor.service.tmp
-        if [ -f "arr-monitor.service.tmp" ]; then
-            SERVICE_FILE="arr-monitor.service.tmp"
-        fi
     fi
     
     if [ -n "$SERVICE_FILE" ]; then
@@ -692,28 +582,19 @@ if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
         echo "💡 Vous pouvez créer le service manuellement avec les instructions ci-dessous"
     fi
 else
-    echo "📋 Instructions pour installation manuelle du service :"
-    echo "   # Créer le fichier service"
-    echo "   sudo tee /etc/systemd/system/arr-monitor.service > /dev/null <<EOF"
-    echo "[Unit]"
-    echo "Description=Arr Monitor - Surveillance Sonarr/Radarr"
-    echo "After=network.target"
+    echo "📋 Service systemd non installé"
     echo ""
-    echo "[Service]"
-    echo "Type=simple"
-    echo "User=$USER"
-    echo "WorkingDirectory=$INSTALL_DIR"
-    echo "ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/arr-monitor.py --config $INSTALL_DIR/config/config.yaml.local"
-    echo "Restart=always"
-    echo "RestartSec=30"
-    echo ""
-    echo "[Install]"
-    echo "WantedBy=multi-user.target"
-    echo "EOF"
-    echo ""
-    echo "   # Activer et démarrer le service"
+    echo "💡 Pour installer le service plus tard :"
+    echo "   cd $INSTALL_DIR"
+    echo "   sudo cp arr-monitor.service /etc/systemd/system/"
+    echo "   sudo sed -i 's/%USER%/$USER/g' /etc/systemd/system/arr-monitor.service"
+    echo "   sudo sed -i 's|%INSTALL_DIR%|$INSTALL_DIR|g' /etc/systemd/system/arr-monitor.service"
     echo "   sudo systemctl daemon-reload"
     echo "   sudo systemctl enable arr-monitor"
     echo "   sudo systemctl start arr-monitor"
-    echo "   sudo systemctl status arr-monitor"
 fi
+
+echo ""
+echo "🎉 Installation terminée !"
+echo ""
+echo "📖 Consultez le README.md pour plus d'informations et la documentation complète"

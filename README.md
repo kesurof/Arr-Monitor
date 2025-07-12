@@ -52,14 +52,7 @@
 
 ## 🚀 Installation
 
-### **Installation Automatique (Recommandée)**
-
-```bash
-# Installation en une ligne depuis n'importe où
-curl -sL https://raw.githubusercontent.com/kesurof/Arr-Monitor/main/install-arr.sh | bash
-```
-
-### **Installation Manuelle**
+### **Installation Recommandée**
 
 ```bash
 # 1. Cloner le projet
@@ -74,30 +67,21 @@ chmod +x install-arr.sh
 ### **Mise à jour**
 
 ```bash
-# Mise à jour automatique (préserve la configuration)
-curl -sL https://raw.githubusercontent.com/kesurof/Arr-Monitor/main/install-arr.sh | bash -s -- --update
-
-# ⚠️  IMPORTANT : La mise à jour doit être exécutée depuis le répertoire d'installation
-# Si vous n'êtes pas dans le bon répertoire, allez d'abord dans :
-# cd /home/$USER/scripts/Arr-Monitor
-# puis relancez la commande de mise à jour
+# Depuis le répertoire d'installation
+cd /home/$USER/scripts/Arr-Monitor
+git pull origin main  # Ou télécharger les nouveaux fichiers
+./install-arr.sh --update
 ```
 
-### **🎯 Modes d'Installation**
+### **🎯 Fonctionnement**
 
-Le script d'installation détecte automatiquement le mode approprié :
+Le script d'installation :
 
-#### **📥 Mode Distant (curl)**
-- **Téléchargement automatique** depuis GitHub
-- **Aucun clonage** requis
-- **Installation depuis n'importe où**
-- **Toujours à jour** avec la dernière version
-
-#### **📁 Mode Local (git clone)**  
-- **Fichiers locaux** déjà présents
-- **Installation hors ligne** possible
-- **Développement** et modifications locales
-- **Version spécifique** du repository
+#### **� Mode Git Clone (Recommandé)**  
+- **Fichiers locaux** après clonage
+- **Installation fiable** depuis le répertoire source
+- **Support complet** de toutes les fonctionnalités
+- **Pas de dépendance réseau** après le clone initial
 
 ### **🎯 Détection Automatique**
 
@@ -224,17 +208,18 @@ grep "ERROR\|CRITICAL" logs/arr-monitor.log
 ### **Mise à jour**
 
 ```bash
-# Mise à jour automatique (recommandée)
-curl -sL https://raw.githubusercontent.com/kesurof/Arr-Monitor/main/install-arr.sh | bash -s -- --update
+# Mise à jour depuis le répertoire d'installation
+cd /home/$USER/scripts/Arr-Monitor
 
-# ⚠️  REMARQUE IMPORTANTE :
-# - Pour une PREMIÈRE installation : peut être exécutée depuis n'importe où
-# - Pour une MISE À JOUR : doit être exécutée depuis le répertoire d'installation
-#   cd /home/$USER/scripts/Arr-Monitor
-
-# Mise à jour manuelle
-cd Arr-Monitor
+# Méthode 1: Git pull (si installé via git clone)
 git pull origin main
+./install-arr.sh --update
+
+# Méthode 2: Re-téléchargement complet
+cd ..
+rm -rf Arr-Monitor
+git clone https://github.com/kesurof/Arr-Monitor.git
+cd Arr-Monitor
 ./install-arr.sh --update
 ```
 
@@ -284,11 +269,10 @@ rm config/config.yaml.local
 ### **Désinstallation Automatique**
 
 ```bash
-# Télécharger et exécuter le script de désinstallation
-curl -sL https://raw.githubusercontent.com/kesurof/Arr-Monitor/main/uninstall-arr.sh | bash
+# Télécharger et exécuter le script de désinstallation (si disponible)
+# curl -sL https://raw.githubusercontent.com/kesurof/Arr-Monitor/main/uninstall-arr.sh | bash
 
-# Ou depuis le répertoire local
-./uninstall-arr.sh
+# Ou désinstallation manuelle (voir ci-dessous)
 ```
 
 ### **Désinstallation Manuelle**
