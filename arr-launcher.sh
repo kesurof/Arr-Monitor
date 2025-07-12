@@ -220,6 +220,11 @@ function $function_name() {
             source venv/bin/activate
             python3 arr-monitor.py --test --debug
             ;;
+        "diagnose")
+            echo "🔬 Diagnostic complet..."
+            source venv/bin/activate
+            python3 arr-monitor.py --diagnose --debug
+            ;;
         "config")
             echo "⚙️ Configuration Arr Monitor..."
             if command -v nano &> /dev/null; then
@@ -256,6 +261,7 @@ function $function_name() {
             echo "Commandes:"
             echo "  start, run    - Démarrer le monitoring (menu interactif)"
             echo "  test          - Exécuter un test unique"
+            echo "  diagnose      - Diagnostic complet de la queue"
             echo "  config        - Éditer la configuration"
             echo "  logs          - Voir les logs en temps réel"
             echo "  update        - Vérifier les mises à jour"
@@ -297,16 +303,17 @@ show_menu() {
     echo ""
     echo -e "${BLUE}1)${NC} 🔄 Lancer Arr Monitor (mode continu)"
     echo -e "${BLUE}2)${NC} 🧪 Test unique (mode debug)"
-    echo -e "${BLUE}3)${NC} ⚙️  Configuration"
-    echo -e "${BLUE}4)${NC} 📊 État du système"
-    echo -e "${BLUE}5)${NC} 🔍 Vérifier les mises à jour"
-    echo -e "${BLUE}6)${NC} 🧹 Nettoyer les logs"
-    echo -e "${BLUE}7)${NC} 📋 Voir les logs en temps réel"
-    echo -e "${BLUE}8)${NC} 🛠️  Installation/Configuration systemd"
-    echo -e "${BLUE}9)${NC} 🎯 Configurer les commandes bashrc"
+    echo -e "${BLUE}3)${NC} 🔬 Diagnostic complet de la queue"
+    echo -e "${BLUE}4)${NC} ⚙️  Configuration"
+    echo -e "${BLUE}5)${NC} 📊 État du système"
+    echo -e "${BLUE}6)${NC} 🔍 Vérifier les mises à jour"
+    echo -e "${BLUE}7)${NC} 🧹 Nettoyer les logs"
+    echo -e "${BLUE}8)${NC} 📋 Voir les logs en temps réel"
+    echo -e "${BLUE}9)${NC} 🛠️  Installation/Configuration systemd"
+    echo -e "${BLUE}A)${NC} 🎯 Configurer les commandes bashrc"
     echo -e "${BLUE}0)${NC} ❌ Quitter"
     echo ""
-    echo -ne "${GREEN}Votre choix [0-9]:${NC} "
+    echo -ne "${GREEN}Votre choix [0-9,A]:${NC} "
 }
 
 # Lancement du monitoring
@@ -324,6 +331,10 @@ start_monitoring() {
         "test")
             log "🧪 Test unique avec debug..."
             python3 "$SCRIPT_DIR/arr-monitor.py" --config "$CONFIG_DIR/config.yaml" --test --debug
+            ;;
+        "diagnose")
+            log "🔬 Diagnostic complet..."
+            python3 "$SCRIPT_DIR/arr-monitor.py" --config "$CONFIG_DIR/config.yaml" --diagnose --debug
             ;;
         "dry-run")
             log "🔍 Mode simulation..."
@@ -434,26 +445,30 @@ main() {
                 read -p "Appuyez sur Entrée pour continuer..."
                 ;;
             3)
-                configure_app
+                start_monitoring "diagnose"
+                read -p "Appuyez sur Entrée pour continuer..."
                 ;;
             4)
-                show_system_status
+                configure_app
                 ;;
             5)
+                show_system_status
+                ;;
+            6)
                 check_updates
                 read -p "Appuyez sur Entrée pour continuer..."
                 ;;
-            6)
+            7)
                 cleanup_logs
                 read -p "Appuyez sur Entrée pour continuer..."
                 ;;
-            7)
+            8)
                 show_live_logs
                 ;;
-            8)
+            9)
                 install_systemd
                 ;;
-            9)
+            A|a)
                 setup_bashrc_integration
                 read -p "Appuyez sur Entrée pour continuer..."
                 ;;
@@ -462,7 +477,7 @@ main() {
                 exit 0
                 ;;
             *)
-                error "Choix invalide. Veuillez sélectionner 0-9."
+                error "Choix invalide. Veuillez sélectionner 0-9 ou A."
                 sleep 2
                 ;;
         esac

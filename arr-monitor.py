@@ -143,26 +143,56 @@ class ArrMonitor:
             return False
     
     def get_queue(self, app_name, url, api_key):
-        """Récupère la queue des téléchargements"""
+        """Récupère la queue des téléchargements avec pagination complète"""
         try:
-            headers = {'X-Api-Key': api_key}
-            response = self.session.get(f"{url}/api/v3/queue", headers=headers, timeout=10)
+            headers = {'X-Api-Key': api_key, 'Content-Type': 'application/json'}
+            all_items = []
+            page = 1
+            page_size = 50
             
-            if response.status_code == 200:
-                data = response.json()
-                # L'API peut retourner une liste directement ou un objet avec 'records'
-                if isinstance(data, list):
-                    return data
-                elif isinstance(data, dict) and 'records' in data:
-                    return data['records']
-                else:
-                    # Si c'est un autre format, on retourne une liste vide
-                    self.logger.warning(f"⚠️  {app_name} format de queue inattendu : {type(data)}")
-                    return []
-            else:
-                self.logger.error(f"❌ {app_name} erreur récupération queue : {response.status_code}")
-                return []
+            while True:
+                # Utiliser la pagination pour récupérer tous les éléments
+                params = {
+                    'page': page, 
+                    'pageSize': page_size,
+                    'sortKey': 'timeleft',
+                    'sortDirection': 'ascending'
+                }
                 
+                response = self.session.get(f"{url}/api/v3/queue", 
+                                          headers=headers, 
+                                          params=params, 
+                                          timeout=15)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    if isinstance(data, dict):
+                        records = data.get('records', [])
+                        total_records = data.get('totalRecords', 0)
+                        
+                        if not records:
+                            break
+                            
+                        all_items.extend(records)
+                        self.logger.debug(f"📄 {app_name} Page {page}: {len(records)} éléments (Total: {len(all_items)}/{total_records})")
+                        
+                        # Si on a récupéré tous les éléments
+                        if len(all_items) >= total_records:
+                            break
+                            
+                        page += 1
+                    else:
+                        # Format liste directe (fallback)
+                        all_items = data
+                        break
+                else:
+                    self.logger.error(f"❌ {app_name} erreur récupération queue page {page} : {response.status_code}")
+                    break
+                    
+            self.logger.debug(f"📊 {app_name} Total récupéré: {len(all_items)} éléments")
+            return all_items
+            
         except requests.exceptions.RequestException as e:
             self.logger.error(f"❌ {app_name} erreur queue : {e}")
             return []
@@ -189,20 +219,27 @@ class ArrMonitor:
             return []
     
     def blocklist_and_search(self, app_name, url, api_key, download_id):
-        """Bloque la release défaillante et recherche une nouvelle release"""
+        """Bloque la release défaillante et lance une nouvelle recherche"""
         try:
-            headers = {'X-Api-Key': api_key}
-            # Utilise l'endpoint pour bloquer et rechercher une nouvelle release
-            data = {
-                'removeFromClient': True,
-                'blacklist': True,
-                'skipRedownload': False
+            headers = {'X-Api-Key': api_key, 'Content-Type': 'application/json'}
+            
+            # Étape 1: Supprimer avec blocklist (comme dans votre script)
+            params = {
+                'removeFromClient': 'true',
+                'blocklist': 'true'
             }
+            
             response = self.session.delete(f"{url}/api/v3/queue/{download_id}", 
-                                         headers=headers, json=data, timeout=10)
+                                         headers=headers, 
+                                         params=params, 
+                                         timeout=15)
             
             if response.status_code in [200, 204]:
-                self.logger.info(f"� {app_name} release {download_id} bloquée et nouvelle recherche lancée")
+                self.logger.info(f"🚫 {app_name} release {download_id} bloquée et supprimée")
+                
+                # Étape 2: Lancer une recherche de nouveaux téléchargements
+                self.trigger_missing_search(app_name, url, api_key)
+                
                 return True
             else:
                 self.logger.error(f"❌ {app_name} erreur blocklist {download_id} : {response.status_code}")
@@ -210,6 +247,35 @@ class ArrMonitor:
                 
         except requests.exceptions.RequestException as e:
             self.logger.error(f"❌ {app_name} erreur blocklist {download_id} : {e}")
+            return False
+    
+    def trigger_missing_search(self, app_name, url, api_key):
+        """Lance une recherche pour les éléments manqués"""
+        try:
+            headers = {'X-Api-Key': api_key, 'Content-Type': 'application/json'}
+            
+            # Commande différente selon l'application
+            if app_name.lower() == 'radarr':
+                search_command = {'name': 'MissingMoviesSearch'}
+            elif app_name.lower() == 'sonarr':
+                search_command = {'name': 'MissingEpisodeSearch'}
+            else:
+                search_command = {'name': 'MissingEpisodeSearch'}  # Fallback
+            
+            response = self.session.post(f"{url}/api/v3/command", 
+                                       headers=headers, 
+                                       json=search_command, 
+                                       timeout=30)
+            
+            if response.status_code == 201:
+                self.logger.info(f"🔍 {app_name} recherche de nouveaux téléchargements lancée")
+                return True
+            else:
+                self.logger.warning(f"⚠️ {app_name} impossible de lancer la recherche automatique : {response.status_code}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            self.logger.warning(f"⚠️ {app_name} erreur lors du lancement de recherche : {e}")
             return False
     
     def remove_download(self, app_name, url, api_key, download_id):
@@ -230,15 +296,33 @@ class ArrMonitor:
             return False
     
     def is_download_failed(self, item):
-        """Vérifie si un téléchargement a l'erreur qBittorrent spécifique"""
+        """Vérifie si un téléchargement a une erreur (détection élargie)"""
         status = item.get('status', '').lower()
         error_message = item.get('errorMessage', '')
+        tracked_status = item.get('trackedDownloadStatus', '').lower()
+        tracked_state = item.get('trackedDownloadState', '').lower()
         
-        # Détection spécifique de l'erreur qBittorrent
-        if error_message and "qBittorrent is reporting an error" in error_message:
-            return True
+        # Détection élargie basée sur vos scripts
+        is_error = (
+            # Erreur qBittorrent spécifique (votre cas principal)
+            (error_message and "qBittorrent is reporting an error" in error_message) or
+            
+            # Autres statuts d'erreur
+            status in ['failed', 'warning', 'error', 'stalled', 'paused'] or
+            
+            # Messages d'erreur généraux
+            bool(error_message) or
+            
+            # Statuts de tracking problématiques
+            tracked_status == 'warning' or
+            tracked_state == 'importfailed'
+        )
         
-        return False
+        if is_error:
+            # Log détaillé pour debug
+            self.logger.debug(f"🔍 Erreur détectée - Status: {status}, Error: {error_message}, Tracked: {tracked_status}/{tracked_state}")
+        
+        return is_error
     
     def process_application(self, app_name, app_config):
         """Traite une application (Sonarr ou Radarr)"""
@@ -267,21 +351,40 @@ class ArrMonitor:
         
         self.logger.info(f"📋 {app_name} {len(queue)} éléments en queue")
         
+        # Statistiques des statuts pour diagnostic
+        status_count = {}
+        for item in queue:
+            status = item.get('status', 'unknown').lower()
+            status_count[status] = status_count.get(status, 0) + 1
+        
+        self.logger.debug(f"📊 {app_name} Statuts: {dict(sorted(status_count.items()))}")
+        
         actions_config = self.config.get('actions', {})
         processed_items = 0
         
         for item in queue:
             item_id = item.get('id')
-            title = item.get('title', 'Unknown')
+            title = item.get('title', item.get('movieTitle', 'Unknown'))
+            status = item.get('status', 'unknown')
+            error_message = item.get('errorMessage', '')
             
-            # Vérification de l'erreur qBittorrent spécifique
+            # Vérification des erreurs avec détection élargie
             if self.is_download_failed(item):
-                self.logger.warning(f"❌ {app_name} erreur qBittorrent détectée : {title}")
+                self.logger.warning(f"❌ {app_name} erreur détectée : {title}")
+                self.logger.warning(f"   📊 Status: {status}")
+                if error_message:
+                    # Anonymiser le message d'erreur s'il contient des infos sensibles
+                    safe_error = self.anonymize_sensitive_data(error_message)
+                    self.logger.warning(f"   🚨 Erreur: {safe_error}")
                 
                 if actions_config.get('auto_retry', True):
+                    self.logger.info(f"🔄 {app_name} traitement de l'erreur pour: {title}")
                     if self.blocklist_and_search(app_name, url, api_key, item_id):
                         processed_items += 1
-                        time.sleep(1)  # Délai entre actions
+                        # Délai plus long pour éviter la surcharge de l'API
+                        time.sleep(2)
+                    else:
+                        self.logger.error(f"❌ {app_name} échec du traitement pour: {title}")
         
         if processed_items > 0:
             self.logger.info(f"✅ {app_name} {processed_items} éléments traités")
@@ -319,6 +422,75 @@ class ArrMonitor:
         except Exception as e:
             self.logger.error(f"❌ Erreur fatale : {e}")
             sys.exit(1)
+    
+    def diagnose_queue(self, app_name, app_config):
+        """Mode diagnostic pour analyser la queue en détail"""
+        url = app_config.get('url')
+        api_key = app_config.get('api_key')
+        
+        if not url or not api_key:
+            self.logger.error(f"❌ {app_name} configuration incomplète pour diagnostic")
+            return
+        
+        self.logger.info(f"🔬 DIAGNOSTIC {app_name}...")
+        self.logger.info(f"📡 URL: {url}")
+        self.logger.info(f"🔑 API Key: {api_key[:8]}***")
+        
+        # Test de connexion
+        if not self.test_connection(app_name, url, api_key):
+            return
+        
+        # Récupération de la queue
+        queue = self.get_queue(app_name, url, api_key)
+        if not queue:
+            self.logger.info(f"📭 {app_name} queue vide")
+            return
+        
+        self.logger.info(f"📊 {app_name} DIAGNOSTIC COMPLET:")
+        self.logger.info(f"📋 Total éléments: {len(queue)}")
+        
+        # Analyse des statuts
+        status_count = {}
+        error_items = []
+        
+        for item in queue:
+            status = item.get('status', 'unknown').lower()
+            status_count[status] = status_count.get(status, 0) + 1
+            
+            if self.is_download_failed(item):
+                error_items.append(item)
+        
+        # Affichage des statistiques
+        self.logger.info("📊 STATUTS COMPLETS:")
+        for status, count in sorted(status_count.items()):
+            self.logger.info(f"   {status}: {count}")
+        
+        self.logger.info(f"🚨 ERREURS DÉTECTÉES: {len(error_items)}")
+        
+        if error_items:
+            self.logger.info("📋 Détail des erreurs:")
+            for i, error in enumerate(error_items[:5], 1):  # Limiter à 5 pour l'affichage
+                title = error.get('title', error.get('movieTitle', 'Titre inconnu'))
+                status = error.get('status', 'N/A')
+                error_msg = error.get('errorMessage', '')
+                tracked_status = error.get('trackedDownloadStatus', '')
+                tracked_state = error.get('trackedDownloadState', '')
+                
+                self.logger.info(f"   {i}. {title}")
+                self.logger.info(f"      Status: {status}")
+                if error_msg:
+                    safe_error = self.anonymize_sensitive_data(error_msg)
+                    self.logger.info(f"      Erreur: {safe_error}")
+                if tracked_status:
+                    self.logger.info(f"      Tracked Status: {tracked_status}")
+                if tracked_state:
+                    self.logger.info(f"      Tracked State: {tracked_state}")
+                self.logger.info("")
+            
+            if len(error_items) > 5:
+                self.logger.info(f"   ... et {len(error_items) - 5} autres erreurs")
+        
+        return len(error_items)
 
 def main():
     parser = argparse.ArgumentParser(description="Arr Monitor - Surveillance Sonarr/Radarr")
@@ -330,6 +502,8 @@ def main():
                        help='Mode debug (logs verbeux)')
     parser.add_argument('--dry-run', '-n', action='store_true', 
                        help='Mode simulation (aucune action)')
+    parser.add_argument('--diagnose', action='store_true', 
+                       help='Mode diagnostic complet de la queue')
     
     args = parser.parse_args()
     
@@ -340,11 +514,25 @@ def main():
     try:
         monitor = ArrMonitor(args.config)
         
-        if args.dry_run:
+        if args.diagnose:
+            # Mode diagnostic spécial
+            monitor.logger.info("🔬 MODE DIAGNOSTIC ACTIVÉ")
+            applications = monitor.config.get('applications', {})
+            
+            total_errors = 0
+            for app_name, app_config in applications.items():
+                if app_config.get('enabled', False):
+                    errors = monitor.diagnose_queue(app_name, app_config)
+                    if errors:
+                        total_errors += errors
+            
+            monitor.logger.info(f"🎯 DIAGNOSTIC TERMINÉ - Total erreurs trouvées: {total_errors}")
+            
+        elif args.dry_run:
             monitor.logger.info("🧪 Mode simulation activé - aucune action ne sera effectuée")
-            # TODO: Implémenter le mode dry-run
-        
-        if args.test:
+            # TODO: Implémenter le mode dry-run complet
+            
+        elif args.test:
             monitor.run_cycle()
         else:
             monitor.run_continuous()
