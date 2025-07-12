@@ -14,7 +14,7 @@ monitoring:
   max_retries: 3
   
 actions:
-  auto_retry: true              # Relancer automatiquement les erreurs qBittorrent
+  auto_retry: true              # Bloquer automatiquement les releases qBittorrent défaillantes et chercher de nouvelles releases
   retry_delay: 60               # Délai entre les actions (1min)
   max_retries: 3                # Nombre max de tentatives
   notify_failures: true        # Notifier les échecs persistants

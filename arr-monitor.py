@@ -119,21 +119,28 @@ class ArrMonitor:
             self.logger.error(f"❌ {app_name} erreur historique : {e}")
             return []
     
-    def retry_download(self, app_name, url, api_key, download_id):
-        """Relance un téléchargement échoué"""
+    def blocklist_and_search(self, app_name, url, api_key, download_id):
+        """Bloque la release défaillante et recherche une nouvelle release"""
         try:
             headers = {'X-Api-Key': api_key}
-            response = self.session.post(f"{url}/api/v3/queue/{download_id}/retry", headers=headers, timeout=10)
+            # Utilise l'endpoint pour bloquer et rechercher une nouvelle release
+            data = {
+                'removeFromClient': True,
+                'blacklist': True,
+                'skipRedownload': False
+            }
+            response = self.session.delete(f"{url}/api/v3/queue/{download_id}", 
+                                         headers=headers, json=data, timeout=10)
             
-            if response.status_code in [200, 201]:
-                self.logger.info(f"🔄 {app_name} téléchargement {download_id} relancé")
+            if response.status_code in [200, 204]:
+                self.logger.info(f"� {app_name} release {download_id} bloquée et nouvelle recherche lancée")
                 return True
             else:
-                self.logger.error(f"❌ {app_name} erreur relance {download_id} : {response.status_code}")
+                self.logger.error(f"❌ {app_name} erreur blocklist {download_id} : {response.status_code}")
                 return False
                 
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"❌ {app_name} erreur relance {download_id} : {e}")
+            self.logger.error(f"❌ {app_name} erreur blocklist {download_id} : {e}")
             return False
     
     def remove_download(self, app_name, url, api_key, download_id):
@@ -203,7 +210,7 @@ class ArrMonitor:
                 self.logger.warning(f"❌ {app_name} erreur qBittorrent détectée : {title}")
                 
                 if actions_config.get('auto_retry', True):
-                    if self.retry_download(app_name, url, api_key, item_id):
+                    if self.blocklist_and_search(app_name, url, api_key, item_id):
                         processed_items += 1
                         time.sleep(1)  # Délai entre actions
         
