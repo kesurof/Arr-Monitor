@@ -462,21 +462,9 @@ except:
         ENABLE_RADARR="N"
     fi
     
-    # Actions automatiques par défaut activées
+    # Actions automatiques activées automatiquement
     AUTO_ACTIONS="Y"
-    echo "🤖 Actions automatiques : activées par défaut"
-    read -p "🤖 Activer les actions automatiques (relance/suppression) ? [Y/n] : " AUTO_ACTIONS
-    AUTO_ACTIONS=${AUTO_ACTIONS:-Y}
-    # Actions automatiques par défaut activées
-    AUTO_ACTIONS="Y"
-    echo "🤖 Actions automatiques : activées par défaut"
-    
-    # Permettre de désactiver si souhaité
-    read -p "🔧 Conserver les actions automatiques ? [Y/n] : " KEEP_AUTO_ACTIONS
-    if [[ $KEEP_AUTO_ACTIONS =~ ^[Nn]$ ]]; then
-        AUTO_ACTIONS="N"
-        echo "   ⚙️  Actions automatiques désactivées"
-    fi
+    echo "🤖 Actions automatiques : activées automatiquement"
     
     # Mise à jour du fichier de configuration
     echo ""
@@ -613,16 +601,19 @@ if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
         sudo systemctl daemon-reload
         sudo systemctl enable arr-monitor
         
+        # Démarrer le service
+        sudo systemctl start arr-monitor
+        
         # Nettoyer les fichiers temporaires
         rm -f arr-monitor.service.final*
         rm -f arr-monitor.service.tmp
         
-        echo "✅ Service systemd installé et activé"
+        echo "✅ Service systemd installé, activé et démarré"
         
         # Vérification finale du statut du service
         echo ""
         echo "🔍 Vérification finale du service..."
-        sleep 3  # Laisser le temps au service de démarrer
+        sleep 3  # Laisser le temps au service de se stabiliser
         
         if sudo systemctl is-active --quiet arr-monitor; then
             echo "✅ Service arr-monitor : ACTIF et FONCTIONNEL"
@@ -635,6 +626,15 @@ if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
             echo ""
             echo "📋 Logs récents du service :"
             sudo journalctl -u arr-monitor -n 5 --no-pager
+            echo ""
+            echo "🔧 Tentative de redémarrage..."
+            sudo systemctl restart arr-monitor
+            sleep 2
+            if sudo systemctl is-active --quiet arr-monitor; then
+                echo "✅ Service redémarré avec succès"
+            else
+                echo "❌ Problème persistant - vérification manuelle requise"
+            fi
         fi
         
         echo ""
