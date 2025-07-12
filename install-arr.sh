@@ -137,20 +137,67 @@ else
     echo "✅ Code déjà corrigé ou à jour"
 fi
 
-# Création de l'environnement virtuel
-echo "🐍 Création de l'environnement virtuel Python..."
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
+# Détection et gestion de l'environnement virtuel
+echo "🐍 Gestion de l'environnement virtuel Python..."
+
+# Vérifier si un venv est déjà actif et contient les dépendances nécessaires
+EXISTING_VENV=""
+if [ -n "$VIRTUAL_ENV" ] && [ -f "$VIRTUAL_ENV/bin/python" ]; then
+    echo "🔍 Environnement virtuel actif détecté: $VIRTUAL_ENV"
+    
+    # Vérifier si les dépendances sont disponibles
+    if "$VIRTUAL_ENV/bin/python" -c "import yaml, requests" &> /dev/null; then
+        echo "✅ Dépendances détectées dans l'environnement actif"
+        EXISTING_VENV="$VIRTUAL_ENV"
+    else
+        echo "⚠️  Dépendances manquantes dans l'environnement actif"
+    fi
 fi
 
-# Activation de l'environnement virtuel
-echo "⚡ Activation de l'environnement virtuel..."
-source venv/bin/activate
+# Vérifier la variable SETTINGS_SOURCE pour un venv existant
+if [ -z "$EXISTING_VENV" ] && [ -n "$SETTINGS_SOURCE" ] && [ -f "$SETTINGS_SOURCE/venv/bin/python" ]; then
+    echo "🔍 Environnement virtuel détecté via SETTINGS_SOURCE: $SETTINGS_SOURCE/venv"
+    
+    if "$SETTINGS_SOURCE/venv/bin/python" -c "import yaml, requests" &> /dev/null; then
+        echo "✅ Dépendances détectées dans SETTINGS_SOURCE/venv"
+        EXISTING_VENV="$SETTINGS_SOURCE/venv"
+    else
+        echo "⚠️  Dépendances manquantes dans SETTINGS_SOURCE/venv"
+    fi
+fi
 
-# Installation des dépendances
-echo "📦 Installation des dépendances Python..."
-pip install --upgrade pip
-pip install -r requirements.txt
+if [ -n "$EXISTING_VENV" ]; then
+    echo "🔗 Utilisation de l'environnement virtuel existant: $EXISTING_VENV"
+    
+    # Créer un lien symbolique vers le venv existant
+    if [ -L "venv" ] || [ -d "venv" ]; then
+        rm -rf venv
+    fi
+    ln -sf "$EXISTING_VENV" venv
+    
+    echo "✅ Lien symbolique créé vers l'environnement existant"
+    
+    # Vérification finale des dépendances
+    if ! "$EXISTING_VENV/bin/python" -c "import yaml, requests" &> /dev/null; then
+        echo "📦 Installation des dépendances manquantes..."
+        "$EXISTING_VENV/bin/pip" install -r requirements.txt
+    fi
+else
+    echo "🐍 Création d'un nouvel environnement virtuel..."
+    if [ ! -d "venv" ] || [ -L "venv" ]; then
+        rm -rf venv
+        python3 -m venv venv
+    fi
+    
+    # Activation de l'environnement virtuel
+    echo "⚡ Activation de l'environnement virtuel..."
+    source venv/bin/activate
+    
+    # Installation des dépendances
+    echo "📦 Installation des dépendances Python..."
+    pip install --upgrade pip
+    pip install -r requirements.txt
+fi
 
 # Création des répertoires
 echo "📁 Création des répertoires..."
@@ -534,10 +581,34 @@ if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
         echo "📋 Installation du service systemd..."
         
         # Vérifier que l'environnement virtuel fonctionne
-        if ! "$INSTALL_DIR/venv/bin/python" -c "import yaml, requests" &> /dev/null; then
+        VENV_PYTHON_PATH=""
+        
+        # Déterminer le chemin Python à utiliser
+        if [ -L "$INSTALL_DIR/venv" ]; then
+            # Si c'est un lien symbolique, résoudre le chemin réel
+            REAL_VENV_PATH=$(readlink -f "$INSTALL_DIR/venv")
+            VENV_PYTHON_PATH="$REAL_VENV_PATH/bin/python"
+            echo "🔗 Utilisation du venv lié: $REAL_VENV_PATH"
+        elif [ -d "$INSTALL_DIR/venv" ]; then
+            # Si c'est un répertoire normal
+            VENV_PYTHON_PATH="$INSTALL_DIR/venv/bin/python"
+            echo "📁 Utilisation du venv local: $INSTALL_DIR/venv"
+        else
+            echo "❌ Aucun environnement virtuel trouvé"
+            exit 1
+        fi
+        
+        if ! "$VENV_PYTHON_PATH" -c "import yaml, requests" &> /dev/null; then
             echo "⚠️  Problème avec l'environnement virtuel, réinstallation des dépendances..."
-            source venv/bin/activate
-            pip install -r requirements.txt
+            if [ -L "$INSTALL_DIR/venv" ]; then
+                # Pour un lien symbolique, installer dans le venv original
+                REAL_VENV_PATH=$(readlink -f "$INSTALL_DIR/venv")
+                "$REAL_VENV_PATH/bin/pip" install -r requirements.txt
+            else
+                # Pour un venv local, activer et installer
+                source venv/bin/activate
+                pip install -r requirements.txt
+            fi
         fi
         
         # Copie et modification du fichier service avec chemin absolu
