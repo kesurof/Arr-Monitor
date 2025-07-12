@@ -5,10 +5,18 @@ set -euo pipefail
 
 # Gestion des paramètres
 FORCE_INSTALL=false
+OPERATION_MODE=""
+
 for arg in "$@"; do
     case $arg in
         --update)
             FORCE_INSTALL=true
+            OPERATION_MODE="update"
+            shift
+            ;;
+        --install)
+            FORCE_INSTALL=true
+            OPERATION_MODE="install"
             shift
             ;;
         *)
@@ -18,16 +26,48 @@ done
 
 echo "🚀 Installation Arr Monitor - Surveillance Sonarr/Radarr"
 echo ""
-echo "📂 Ce script va :"
-echo "   • Copier les fichiers depuis le répertoire courant"
-echo "   • Les installer dans un répertoire de destination"
-echo "   • Créer un environnement Python virtuel"
-echo "   • Configurer l'application de manière interactive"
+
+# Si pas de paramètre, demander le mode d'opération
+if [ -z "$OPERATION_MODE" ]; then
+    echo "🎯 Sélectionnez le mode d'opération :"
+    echo "   1️⃣  Nouvelle installation"
+    echo "   2️⃣  Mise à jour (préserve la configuration existante)"
+    echo ""
+    read -p "Votre choix [1/2] : " CHOICE
+    
+    case $CHOICE in
+        1)
+            OPERATION_MODE="install"
+            ;;
+        2)
+            OPERATION_MODE="update"
+            FORCE_INSTALL=true
+            ;;
+        *)
+            echo "❌ Choix invalide. Abandon."
+            exit 1
+            ;;
+    esac
+fi
+
+echo ""
+if [ "$OPERATION_MODE" = "install" ]; then
+    echo "📂 Mode : NOUVELLE INSTALLATION"
+    echo "   • Copier les fichiers depuis le répertoire courant"
+    echo "   • Les installer dans un répertoire de destination"
+    echo "   • Créer un environnement Python virtuel"
+    echo "   • Détecter automatiquement Sonarr/Radarr"
+elif [ "$OPERATION_MODE" = "update" ]; then
+    echo "📂 Mode : MISE À JOUR"
+    echo "   • Mettre à jour les fichiers dans l'installation existante"
+    echo "   • Préserver la configuration actuelle"
+    echo "   • Maintenir l'environnement virtuel existant"
+fi
 echo ""
 echo "💡 Utilisation typique :"
-echo "   git clone https://github.com/kesurof/Arr-Monitor.git"
-echo "   cd Arr-Monitor"
-echo "   ./install-arr.sh"
+echo "   # Pour mise à jour depuis /tmp :"
+echo "   cd /tmp && git clone https://github.com/kesurof/Arr-Monitor.git"
+echo "   cd Arr-Monitor && ./install-arr.sh --update"
 echo ""
 
 # Vérification des prérequis
@@ -57,11 +97,12 @@ SOURCE_DIR="$(pwd)"
 
 # Demander l'emplacement pour l'installation
 echo ""
-if [ "$FORCE_INSTALL" = true ]; then
-    # Mode non-interactif pour --update
+if [ "$OPERATION_MODE" = "update" ]; then
+    # Mode mise à jour : utiliser le répertoire par défaut
     SCRIPTS_DIR="/home/$USER/scripts"
-    echo "📁 Mode mise à jour : utilisation du répertoire par défaut"
+    echo "📁 Mode mise à jour : utilisation du répertoire par défaut ($SCRIPTS_DIR)"
 else
+    # Mode installation : demander le répertoire
     read -p "📁 Répertoire d'installation des scripts [/home/$USER/scripts] : " SCRIPTS_DIR
 fi
 SCRIPTS_DIR=${SCRIPTS_DIR:-/home/$USER/scripts}
@@ -73,11 +114,26 @@ echo "📁 Installation dans : $INSTALL_DIR"
 # Création du répertoire d'installation
 IS_UPDATE=false
 if [ -d "$INSTALL_DIR" ]; then
-    echo "📂 Installation existante détectée. Mode mise à jour activé."
-    IS_UPDATE=true
+    if [ "$OPERATION_MODE" = "update" ]; then
+        echo "📂 Installation existante trouvée. Mode mise à jour confirmé."
+        IS_UPDATE=true
+    else
+        echo "📂 Installation existante détectée."
+        read -p "🔄 Voulez-vous faire une mise à jour (y) ou réinstaller complètement (n) ? [y/N] : " UPDATE_CHOICE
+        if [[ $UPDATE_CHOICE =~ ^[Yy]$ ]]; then
+            IS_UPDATE=true
+            OPERATION_MODE="update"
+            echo "✅ Mode mise à jour activé"
+        else
+            echo "🗑️  Suppression de l'installation existante..."
+            rm -rf "$INSTALL_DIR"
+            mkdir -p "$INSTALL_DIR"
+            echo "✅ Répertoire nettoyé pour nouvelle installation"
+        fi
+    fi
     
-    # Sauvegarde de la configuration existante si elle existe
-    if [ -f "$INSTALL_DIR/config/config.yaml.local" ]; then
+    # Sauvegarde de la configuration existante si mise à jour
+    if [ "$IS_UPDATE" = true ] && [ -f "$INSTALL_DIR/config/config.yaml.local" ]; then
         BACKUP_FILE="$INSTALL_DIR/config/config.yaml.local.backup.$(date +%Y%m%d_%H%M%S)"
         echo "💾 Sauvegarde de la configuration : $(basename "$BACKUP_FILE")"
         cp "$INSTALL_DIR/config/config.yaml.local" "$BACKUP_FILE"
@@ -336,96 +392,94 @@ detect_api_keys() {
 # Configuration interactive seulement si nouveau fichier créé
 if [ "$CONFIG_CREATED" = true ]; then
     echo ""
-    echo "📋 Configuration des applications :"
+    echo "📋 Configuration automatique des applications :"
     
     # Détection automatique
     detect_containers
     detect_api_keys
     
-    # Configuration Sonarr
-    echo ""
-    read -p "📺 Activer Sonarr ? [Y/n] : " ENABLE_SONARR
-    ENABLE_SONARR=${ENABLE_SONARR:-Y}
+    # Configuration automatique Sonarr
+    ENABLE_SONARR="Y"
+    SONARR_URL=""
+    SONARR_API=""
     
-    if [[ $ENABLE_SONARR =~ ^[Yy]$ ]]; then
-        DEFAULT_SONARR_URL=${SONARR_DETECTED:-http://localhost:8989}
-        read -p "📺 URL Sonarr [$DEFAULT_SONARR_URL] : " SONARR_URL
-        SONARR_URL=${SONARR_URL:-$DEFAULT_SONARR_URL}
+    if [ -n "$SONARR_DETECTED" ] && [ -n "$SONARR_API_DETECTED" ]; then
+        SONARR_URL="$SONARR_DETECTED"
+        SONARR_API="$SONARR_API_DETECTED"
+        echo "� Sonarr configuré automatiquement : $SONARR_URL"
         
-        if [ -n "$SONARR_API_DETECTED" ]; then
-            read -p "🔑 Clé API Sonarr [détectée automatiquement] : " SONARR_API
-            SONARR_API=${SONARR_API:-$SONARR_API_DETECTED}
-        else
-            read -p "🔑 Clé API Sonarr : " SONARR_API
-        fi
-        
-        # Test de connexion
-        echo "🧪 Test de connexion Sonarr..."
+        # Test de connexion silencieux
         if python -c "
 import requests
 try:
     response = requests.get('$SONARR_URL/api/v3/system/status', headers={'X-Api-Key': '$SONARR_API'}, timeout=5)
     if response.status_code == 200:
-        print('✅ Connexion Sonarr réussie')
         exit(0)
     else:
-        print('⚠️  Réponse inattendue de Sonarr (code: {})'.format(response.status_code))
         exit(1)
-except Exception as e:
-    print('⚠️  Impossible de se connecter à Sonarr (vérifiez l'\''URL et la clé API)')
+except:
     exit(1)
 " 2>/dev/null; then
-            :
+            echo "   ✅ Connexion Sonarr vérifiée"
         else
-            :
+            echo "   ⚠️  Connexion Sonarr échouée - configuration manuelle requise"
+            ENABLE_SONARR="N"
         fi
+    else
+        echo "📺 Sonarr non détecté automatiquement - désactivé"
+        ENABLE_SONARR="N"
     fi
     
-    # Configuration Radarr
-    echo ""
-    read -p "🎬 Activer Radarr ? [Y/n] : " ENABLE_RADARR
-    ENABLE_RADARR=${ENABLE_RADARR:-Y}
+    # Configuration automatique Radarr  
+    ENABLE_RADARR="Y"
+    RADARR_URL=""
+    RADARR_API=""
     
-    if [[ $ENABLE_RADARR =~ ^[Yy]$ ]]; then
-        DEFAULT_RADARR_URL=${RADARR_DETECTED:-http://localhost:7878}
-        read -p "🎬 URL Radarr [$DEFAULT_RADARR_URL] : " RADARR_URL
-        RADARR_URL=${RADARR_URL:-$DEFAULT_RADARR_URL}
+    if [ -n "$RADARR_DETECTED" ] && [ -n "$RADARR_API_DETECTED" ]; then
+        RADARR_URL="$RADARR_DETECTED"
+        RADARR_API="$RADARR_API_DETECTED"
+        echo "🎬 Radarr configuré automatiquement : $RADARR_URL"
         
-        if [ -n "$RADARR_API_DETECTED" ]; then
-            read -p "🔑 Clé API Radarr [détectée automatiquement] : " RADARR_API
-            RADARR_API=${RADARR_API:-$RADARR_API_DETECTED}
-        else
-            read -p "🔑 Clé API Radarr : " RADARR_API
-        fi
-        
-        # Test de connexion
-        echo "🧪 Test de connexion Radarr..."
+        # Test de connexion silencieux
         if python -c "
 import requests
 try:
     response = requests.get('$RADARR_URL/api/v3/system/status', headers={'X-Api-Key': '$RADARR_API'}, timeout=5)
     if response.status_code == 200:
-        print('✅ Connexion Radarr réussie')
         exit(0)
     else:
-        print('⚠️  Réponse inattendue de Radarr (code: {})'.format(response.status_code))
         exit(1)
-except Exception as e:
-    print('⚠️  Impossible de se connecter à Radarr (vérifiez l'\''URL et la clé API)')
+except:
     exit(1)
 " 2>/dev/null; then
-            :
+            echo "   ✅ Connexion Radarr vérifiée"
         else
-            :
+            echo "   ⚠️  Connexion Radarr échouée - configuration manuelle requise"
+            ENABLE_RADARR="N"
         fi
+    else
+        echo "🎬 Radarr non détecté automatiquement - désactivé"
+        ENABLE_RADARR="N"
     fi
     
-    # Configuration des actions automatiques
-    echo ""
+    # Actions automatiques par défaut activées
+    AUTO_ACTIONS="Y"
+    echo "🤖 Actions automatiques : activées par défaut"
     read -p "🤖 Activer les actions automatiques (relance/suppression) ? [Y/n] : " AUTO_ACTIONS
     AUTO_ACTIONS=${AUTO_ACTIONS:-Y}
+    # Actions automatiques par défaut activées
+    AUTO_ACTIONS="Y"
+    echo "🤖 Actions automatiques : activées par défaut"
+    
+    # Permettre de désactiver si souhaité
+    read -p "🔧 Conserver les actions automatiques ? [Y/n] : " KEEP_AUTO_ACTIONS
+    if [[ $KEEP_AUTO_ACTIONS =~ ^[Nn]$ ]]; then
+        AUTO_ACTIONS="N"
+        echo "   ⚙️  Actions automatiques désactivées"
+    fi
     
     # Mise à jour du fichier de configuration
+    echo ""
     echo "📝 Mise à jour de la configuration..."
     
     if [[ $ENABLE_SONARR =~ ^[Yy]$ ]]; then

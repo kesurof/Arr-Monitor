@@ -67,11 +67,46 @@ chmod +x install-arr.sh
 ### **Mise à jour**
 
 ```bash
-# Depuis le répertoire d'installation
-cd /home/$USER/scripts/Arr-Monitor
-git pull origin main  # Ou télécharger les nouveaux fichiers
+# Aller dans un répertoire temporaire (recommandé)
+cd /tmp
+
+# Cloner la dernière version
+git clone https://github.com/kesurof/Arr-Monitor.git
+cd Arr-Monitor
+
+# Lancer la mise à jour (préserve la configuration)
 ./install-arr.sh --update
+
+# Alternative : mode interactif (choisir "2" pour mise à jour)
+./install-arr.sh
 ```
+
+### **🎯 Modes d'Opération**
+
+Le script propose deux modes :
+
+#### **1️⃣ Nouvelle Installation**
+- **Configuration complète** depuis zéro
+- **Détection automatique** de Sonarr/Radarr
+- **Choix du répertoire** d'installation
+- **Configuration interactive** des paramètres
+
+#### **2️⃣ Mise à Jour**
+- **Préservation** de la configuration existante
+- **Mise à jour** des fichiers programme uniquement
+- **Répertoire fixe** : `/home/$USER/scripts/Arr-Monitor`
+- **Aucune question** sur Sonarr/Radarr (utilise la config existante)
+
+### **🤖 Configuration Automatique**
+
+Le script détecte automatiquement :
+- 🔍 **Conteneurs Docker** Sonarr/Radarr en cours d'exécution
+- 🔑 **Clés API** depuis les fichiers de configuration  
+- 🌐 **URLs et ports** des applications
+- ✅ **Test de connexion** automatique pour validation
+
+**Si détection réussie** : Configuration automatique, aucune question posée
+**Si détection échouée** : Application désactivée (peut être configurée manuellement)
 
 ### **🎯 Fonctionnement**
 
@@ -208,20 +243,26 @@ grep "ERROR\|CRITICAL" logs/arr-monitor.log
 ### **Mise à jour**
 
 ```bash
-# Mise à jour depuis le répertoire d'installation
-cd /home/$USER/scripts/Arr-Monitor
-
-# Méthode 1: Git pull (si installé via git clone)
-git pull origin main
-./install-arr.sh --update
-
-# Méthode 2: Re-téléchargement complet
-cd ..
-rm -rf Arr-Monitor
+# Méthode recommandée : depuis /tmp
+cd /tmp
 git clone https://github.com/kesurof/Arr-Monitor.git
 cd Arr-Monitor
 ./install-arr.sh --update
+
+# Alternative : mode interactif
+cd /tmp
+git clone https://github.com/kesurof/Arr-Monitor.git
+cd Arr-Monitor
+./install-arr.sh
+# Puis choisir "2" pour mise à jour
 ```
+
+### **💡 Pourquoi utiliser /tmp pour les mises à jour ?**
+
+- ✅ **Répertoire temporaire** nettoyé automatiquement
+- ✅ **Pas d'encombrement** du système 
+- ✅ **Version fraîche** à chaque fois
+- ✅ **Pas de conflit** avec installations existantes
 
 ### **Sauvegarde de Configuration**
 
