@@ -4,40 +4,18 @@ applications:
     enabled: true
     url: "http://localhost:8989"
     api_key: "your_sonarr_api_key"
-    check_downloads: true
-    check_failed: true
-    check_stuck: true
   radarr:
     enabled: true
     url: "http://localhost:7878"
     api_key: "your_radarr_api_key"
-    check_downloads: true
-    check_failed: true
-    check_stuck: true
 
 monitoring:
   check_interval: 300           # Intervalle en secondes (5 minutes)
   max_retries: 3
-  stuck_threshold: 3600         # Téléchargements bloqués > 1h
-  failed_threshold: 24          # Échecs > 24h
-  
-error_patterns:
-  download_errors:
-    - "failed"
-    - "error"
-    - "timeout"
-    - "connection refused"
-    - "no space"
-  
-  stuck_patterns:
-    - "stalled"
-    - "paused"
-    - "queued"
-    - "downloading"
   
 actions:
-  auto_retry: true              # Relancer automatiquement les échecs
-  retry_delay: 1800             # Délai avant nouvelle tentative (30min)
+  auto_retry: true              # Relancer automatiquement les erreurs qBittorrent
+  retry_delay: 60               # Délai entre les actions (1min)
   max_retries: 3                # Nombre max de tentatives
   notify_failures: true        # Notifier les échecs persistants
 

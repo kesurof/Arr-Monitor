@@ -165,16 +165,14 @@ radarr:
 ### **Personnalisation**
 
 ```yaml
-# Seuils de surveillance
+# Surveillance ciblée
 monitoring:
   check_interval: 300        # Vérification toutes les 5 minutes
-  stuck_threshold: 3600      # Téléchargement bloqué après 1h
-  retry_threshold: 1800      # Nouvelle tentative après 30min
 
 # Actions automatiques  
 actions:
   auto_retry: true           # Relance automatique
-  auto_remove: true          # Suppression automatique
+  retry_delay: 60            # Délai entre actions (1min)
   max_retries: 3             # Maximum 3 tentatives
 
 # Notifications
@@ -187,39 +185,28 @@ notifications:
     smtp_server: "smtp.gmail.com"
 ```
 
-### **🎯 Comprendre les Seuils de Surveillance**
+### **🎯 Surveillance Simplifiée**
 
-**Les seuils de temps définissent quand et comment agir :**
+**Le monitoring détecte uniquement l'erreur spécifique :**
 
-#### **📊 `check_interval: 300`** (5 minutes)
-- **Fréquence** de vérification des files d'attente
-- **Plus court** = détection plus rapide mais plus de charge
-- **Plus long** = moins de ressources mais détection plus lente
+#### **� Erreur Ciblée**
+- **Message détecté** : `"qBittorrent is reporting an error"`
+- **Action automatique** : Relance immédiate du téléchargement
+- **Délai entre actions** : 1 minute (configurable)
 
-#### **⏸️ `stuck_threshold: 3600`** (1 heure) 
-- **Temps d'immobilité** avant qu'un téléchargement soit considéré comme **bloqué**
-- **Exemple** : Un téléchargement reste en "Downloading" pendant 1h sans progression
-- **Action** : Suppression + nouvelle recherche automatique
-
-#### **🔄 `retry_threshold: 1800`** (30 minutes)
-- **Délai d'attente** avant de **relancer** un téléchargement qui a échoué  
-- **Exemple** : Un téléchargement échoue, on attend 30min avant nouvelle tentative
-- **Action** : Relance automatique via l'API
-
-#### **📈 Différence Important :**
-- **`stuck_threshold`** → Surveille les téléchargements **figés** (aucune progression)
-- **`retry_threshold`** → Gère les téléchargements **échoués** (avec erreur)
-
-#### **💡 Exemple concret :**
+#### **⚡ Fonctionnement Simple**
 ```bash
-# 23:00 - Téléchargement démarre : "Downloading" 
-# 00:00 - Toujours "Downloading" sans progression → Détecté comme BLOQUÉ
-# 00:01 - Action : Suppression + nouvelle recherche
-
-# 23:30 - Téléchargement échoue : "Failed - Connection timeout"
-# 00:00 - Attente de 30min (retry_threshold) 
-# 00:01 - Action : Relance automatique du téléchargement
+# Détection automatique
+❌ Erreur qBittorrent détectée : "Film Title"
+🔄 Relance automatique du téléchargement
+✅ Téléchargement relancé avec succès
 ```
+
+#### **� Avantages**
+- **Focus** sur l'erreur qBittorrent spécifique
+- **Pas de délais complexes** ou seuils temporels
+- **Réaction immédiate** dès détection de l'erreur
+- **Configuration minimale** requise
 
 ## 📋 Utilisation
 

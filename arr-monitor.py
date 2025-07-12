@@ -153,57 +153,15 @@ class ArrMonitor:
             self.logger.error(f"❌ {app_name} erreur suppression {download_id} : {e}")
             return False
     
-    def search_missing(self, app_name, url, api_key):
-        """Lance une recherche des éléments manquants"""
-        try:
-            headers = {'X-Api-Key': api_key}
-            command = "MissingMoviesSearch" if app_name.lower() == "radarr" else "MissingEpisodeSearch"
-            
-            data = {"name": command}
-            response = self.session.post(f"{url}/api/v3/command", headers=headers, json=data, timeout=10)
-            
-            if response.status_code in [200, 201]:
-                self.logger.info(f"🔍 {app_name} recherche manquants lancée")
-                return True
-            else:
-                self.logger.error(f"❌ {app_name} erreur recherche : {response.status_code}")
-                return False
-                
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"❌ {app_name} erreur recherche : {e}")
-            return False
-    
-    def is_download_stuck(self, item):
-        """Vérifie si un téléchargement est bloqué"""
-        status = item.get('status', '').lower()
-        stuck_patterns = self.config.get('error_patterns', {}).get('stuck_patterns', [])
-        
-        # Vérifie les patterns de blocage
-        for pattern in stuck_patterns:
-            if pattern.lower() in status:
-                # Vérifie depuis combien de temps
-                added_time = item.get('added')
-                if added_time:
-                    try:
-                        added_dt = datetime.fromisoformat(added_time.replace('Z', '+00:00'))
-                        stuck_threshold = self.config.get('monitoring', {}).get('stuck_threshold', 3600)
-                        if (datetime.now().timestamp() - added_dt.timestamp()) > stuck_threshold:
-                            return True
-                    except (ValueError, TypeError):
-                        pass
-        return False
-    
     def is_download_failed(self, item):
-        """Vérifie si un téléchargement a échoué"""
+        """Vérifie si un téléchargement a l'erreur qBittorrent spécifique"""
         status = item.get('status', '').lower()
-        error_message = item.get('errorMessage', '').lower()
+        error_message = item.get('errorMessage', '')
         
-        error_patterns = self.config.get('error_patterns', {}).get('download_errors', [])
+        # Détection spécifique de l'erreur qBittorrent
+        if error_message and "qBittorrent is reporting an error" in error_message:
+            return True
         
-        # Vérifie les patterns d'erreur
-        for pattern in error_patterns:
-            if pattern.lower() in status or pattern.lower() in error_message:
-                return True
         return False
     
     def process_application(self, app_name, app_config):
@@ -240,25 +198,14 @@ class ArrMonitor:
             item_id = item.get('id')
             title = item.get('title', 'Unknown')
             
-            # Vérification des téléchargements échoués
-            if app_config.get('check_failed', True) and self.is_download_failed(item):
-                self.logger.warning(f"❌ {app_name} échec détecté : {title}")
+            # Vérification de l'erreur qBittorrent spécifique
+            if self.is_download_failed(item):
+                self.logger.warning(f"❌ {app_name} erreur qBittorrent détectée : {title}")
                 
                 if actions_config.get('auto_retry', True):
                     if self.retry_download(app_name, url, api_key, item_id):
                         processed_items += 1
                         time.sleep(1)  # Délai entre actions
-                
-            # Vérification des téléchargements bloqués
-            elif app_config.get('check_stuck', True) and self.is_download_stuck(item):
-                self.logger.warning(f"⏸️  {app_name} téléchargement bloqué : {title}")
-                
-                if actions_config.get('auto_retry', True):
-                    # Supprime et relance une recherche
-                    if self.remove_download(app_name, url, api_key, item_id):
-                        time.sleep(2)
-                        self.search_missing(app_name, url, api_key)
-                        processed_items += 1
         
         if processed_items > 0:
             self.logger.info(f"✅ {app_name} {processed_items} éléments traités")
