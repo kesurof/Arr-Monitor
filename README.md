@@ -187,6 +187,40 @@ notifications:
     smtp_server: "smtp.gmail.com"
 ```
 
+### **🎯 Comprendre les Seuils de Surveillance**
+
+**Les seuils de temps définissent quand et comment agir :**
+
+#### **📊 `check_interval: 300`** (5 minutes)
+- **Fréquence** de vérification des files d'attente
+- **Plus court** = détection plus rapide mais plus de charge
+- **Plus long** = moins de ressources mais détection plus lente
+
+#### **⏸️ `stuck_threshold: 3600`** (1 heure) 
+- **Temps d'immobilité** avant qu'un téléchargement soit considéré comme **bloqué**
+- **Exemple** : Un téléchargement reste en "Downloading" pendant 1h sans progression
+- **Action** : Suppression + nouvelle recherche automatique
+
+#### **🔄 `retry_threshold: 1800`** (30 minutes)
+- **Délai d'attente** avant de **relancer** un téléchargement qui a échoué  
+- **Exemple** : Un téléchargement échoue, on attend 30min avant nouvelle tentative
+- **Action** : Relance automatique via l'API
+
+#### **📈 Différence Important :**
+- **`stuck_threshold`** → Surveille les téléchargements **figés** (aucune progression)
+- **`retry_threshold`** → Gère les téléchargements **échoués** (avec erreur)
+
+#### **💡 Exemple concret :**
+```bash
+# 23:00 - Téléchargement démarre : "Downloading" 
+# 00:00 - Toujours "Downloading" sans progression → Détecté comme BLOQUÉ
+# 00:01 - Action : Suppression + nouvelle recherche
+
+# 23:30 - Téléchargement échoue : "Failed - Connection timeout"
+# 00:00 - Attente de 30min (retry_threshold) 
+# 00:01 - Action : Relance automatique du téléchargement
+```
+
 ## 📋 Utilisation
 
 ### **Commandes de Base**
