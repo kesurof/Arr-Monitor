@@ -1,5 +1,54 @@
 # 📋 Changelog - Arr Monitor
 
+## [1.1.0] - 2025-07-13
+
+### 🔬 Nouvelles fonctionnalités majeures
+- **Mode diagnostic complet** avec analyse détaillée des queues
+- **Commandes bashrc globales** : `arr-monitor` disponible partout dans le terminal
+- **Blocklist and Search véritablement fonctionnel** avec API corrigée
+- **Pagination complète** pour récupérer toutes les entrées des grandes queues
+- **Détection élargie des erreurs** : warning, failed, stalled, paused, importFailed
+
+### 🔧 Améliorations techniques
+- **API Sonarr/Radarr corrigée** : utilisation des bons paramètres pour blocklist
+- **Pagination automatique** : gestion des queues avec des centaines d'éléments
+- **Timeouts étendus** pour les environnements ARM64
+- **Headers Content-Type** appropriés pour toutes les requêtes API
+- **Commandes de recherche spécifiques** : MissingMoviesSearch vs MissingEpisodeSearch
+
+### 🎯 Interface utilisateur
+- **Option diagnostic** dans le menu principal (option 3)
+- **Intégration bashrc** dans le menu (option A)
+- **Commandes disponibles partout** : arr-monitor, arrmonitor, arr
+- **Aide intégrée** avec `arr-monitor help`
+- **Gestion d'erreurs améliorée** avec anonymisation
+
+### 📊 Diagnostic et debug
+- **Analyse statistique complète** des statuts de queue
+- **Détail des erreurs** avec informations de tracking
+- **Mode --diagnose** pour dépannage
+- **Logs anonymisés** pour protection de la vie privée
+- **Rapport détaillé** des problèmes détectés
+
+### 🚀 Commandes bashrc
+- `arr-monitor` : Menu principal
+- `arr-monitor start` : Démarrage monitoring
+- `arr-monitor test` : Test debug
+- `arr-monitor diagnose` : Diagnostic complet
+- `arr-monitor config` : Édition configuration
+- `arr-monitor logs` : Logs temps réel
+- `arr-monitor update` : Vérification mises à jour
+- `arr-monitor help` : Aide complète
+
+### 🔧 Corrections de bugs
+- **Pagination manquante** : récupération complète des queues
+- **Paramètres API incorrects** : blocklist fonctionne maintenant
+- **Détection d'erreurs limitée** : élargie à tous les statuts problématiques
+- **Timeouts insuffisants** : adaptés aux serveurs ARM64
+- **Recherche manuelle** : automatisée après blocklist
+
+---
+
 ## [1.0.0] - 2025-07-13
 
 ### 🆕 Nouvelles fonctionnalités

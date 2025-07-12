@@ -1,6 +1,6 @@
-# � Arr Monitor v1.0.0 - Surveillance Sonarr/Radarr
+# 🚀 Arr Monitor v1.1.0 - Surveillance Sonarr/Radarr � Arr Monitor v1.0.0 - Surveillance Sonarr/Radarr
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/kesurof/Arr-Monitor)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/kesurof/Arr-Monitor)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![ARM64](https://img.shields.io/badge/ARM64-optimized-green.svg)](https://arm.com)
@@ -9,12 +9,19 @@
 
 **Arr Monitor** est un outil de surveillance et de gestion automatique optimisé pour les serveurs ARM64. Il surveille Sonarr et Radarr, détecte les erreurs qBittorrent spécifiques, et applique l'action "Blocklist and Search" pour une résolution intelligente.
 
-### 🎯 **Nouveautés v1.0.0**
+### 🎯 **Nouveautés v1.1.0**
+- 🔬 **Mode diagnostic complet** pour analyser les queues en détail
+- 🎯 **Commandes bashrc globales** : `arr-monitor` disponible partout
+- 🚫 **Blocklist and Search** véritablement fonctionnel
+- 📊 **Pagination complète** pour les grandes queues  
+- 🔍 **Détection élargie** des erreurs (warning, failed, stalled, etc.)
+- 🔧 **API améliorée** avec paramètres corrects pour Sonarr/Radarr
+
+### 🎯 **Fonctionnalités v1.0.0**
 - 🔧 **Optimisations ARM64** spécifiques pour votre environnement
 - 🔒 **Anonymisation automatique** des données sensibles
 - 🆕 **Détection des mises à jour** GitHub automatique
 - 🎯 **Menu interactif unifié** avec toutes les fonctions
-- 🚫 **Action "Blocklist and Search"** au lieu du simple retry
 - 📊 **Monitoring système** intégré
 
 ## ✨ Fonctionnalités
@@ -98,12 +105,14 @@ cd Arr-Monitor
 Le menu vous proposera :
 - 🔄 **Monitoring continu** avec optimisations ARM64
 - 🧪 **Test unique** pour vérifier la configuration  
+- 🔬 **Diagnostic complet** pour analyser les erreurs
 - ⚙️ **Configuration** interactive
 - 📊 **État du système** détaillé
 - 🔍 **Vérification des mises à jour** GitHub
 - 🧹 **Nettoyage des logs** avec anonymisation
 - 📋 **Logs temps réel**
 - 🛠️ **Installation systemd** automatique
+- 🎯 **Configuration commandes bashrc**
 
 ### 🔧 **Installation classique (si préférée)**
 
