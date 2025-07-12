@@ -3,6 +3,10 @@
 # Script d'installation Arr Monitor (Surveillance Sonarr/Radarr)
 set -euo pipefail
 
+# Configuration du projet
+GITHUB_REPO="kesurof/Arr-Monitor"
+GITHUB_RAW_URL="https://raw.githubusercontent.com/$GITHUB_REPO/main"
+
 # Gestion des paramètres
 FORCE_INSTALL=false
 for arg in "$@"; do
@@ -19,15 +23,13 @@ done
 echo "🚀 Installation Arr Monitor - Surveillance Sonarr/Radarr"
 echo ""
 echo "📂 Ce script va :"
-echo "   • Copier les fichiers depuis le répertoire courant"
+echo "   • Télécharger les fichiers depuis GitHub"
 echo "   • Les installer dans un répertoire de destination"
 echo "   • Créer un environnement Python virtuel"
 echo "   • Configurer l'application de manière interactive"
 echo ""
-echo "💡 Utilisation typique :"
-echo "   git clone https://github.com/kesurof/Arr-Monitor.git"
-echo "   cd Arr-Monitor"
-echo "   ./install-arr.sh"
+echo "💡 Utilisation :"
+echo "   curl -sL https://raw.githubusercontent.com/$GITHUB_REPO/main/install-arr.sh | bash"
 echo ""
 
 # Vérification des prérequis
@@ -38,6 +40,11 @@ fi
 
 if ! command -v pip3 &> /dev/null; then
     echo "❌ pip3 n'est pas installé. Veuillez l'installer avant de continuer."
+    exit 1
+fi
+
+if ! command -v curl &> /dev/null; then
+    echo "❌ curl n'est pas installé. Veuillez l'installer avant de continuer."
     exit 1
 fi
 
@@ -56,28 +63,17 @@ SCRIPTS_DIR=${SCRIPTS_DIR:-/home/$USER/scripts}
 INSTALL_DIR="$SCRIPTS_DIR/Arr-Monitor"
 echo "📁 Installation dans : $INSTALL_DIR"
 
-# Déterminer le répertoire source AVANT de changer de répertoire
-SOURCE_DIR="$(dirname "$0")"
-SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd)"
-echo "📋 Répertoire source : $SOURCE_DIR"
-
-# Vérification des fichiers requis dans le répertoire source
-REQUIRED_FILES=("arr-monitor.py" "requirements.txt" "config.yaml")
-MISSING_FILES=()
-
-for file in "${REQUIRED_FILES[@]}"; do
-    if [ ! -f "$SOURCE_DIR/$file" ]; then
-        MISSING_FILES+=("$file")
-    fi
-done
-
-if [ ${#MISSING_FILES[@]} -ne 0 ]; then
-    echo "❌ Fichiers manquants dans $SOURCE_DIR :"
-    printf "   - %s\n" "${MISSING_FILES[@]}"
-    echo ""
-    echo "💡 Assurez-vous d'exécuter ce script depuis le répertoire contenant les fichiers du projet."
-    echo "   Exemple : cd /path/to/Arr-Monitor && ./install-arr.sh"
-    exit 1
+# Déterminer le mode d'installation
+INSTALL_MODE=""
+if [ -f "$(pwd)/arr-monitor.py" ] && [ -f "$(pwd)/requirements.txt" ] && [ -f "$(pwd)/config.yaml" ]; then
+    # Mode local : fichiers présents dans le répertoire courant
+    SOURCE_DIR="$(pwd)"
+    INSTALL_MODE="local"
+    echo "📋 Mode installation : LOCAL (fichiers détectés dans $(pwd))"
+else
+    # Mode distant : téléchargement depuis GitHub
+    INSTALL_MODE="remote"
+    echo "📋 Mode installation : DISTANT (téléchargement depuis GitHub)"
 fi
 
 # Création du répertoire d'installation
@@ -100,14 +96,49 @@ fi
 # Maintenant on peut changer de répertoire
 cd "$INSTALL_DIR"
 
-# Copie des fichiers depuis le répertoire source
-echo "📋 Copie des fichiers depuis $SOURCE_DIR vers $INSTALL_DIR..."
-cp "$SOURCE_DIR/arr-monitor.py" ./
-cp "$SOURCE_DIR/requirements.txt" ./
-
-# Création du répertoire config et copie
-mkdir -p config
-cp "$SOURCE_DIR/config.yaml" config/
+# Téléchargement ou copie des fichiers
+if [ "$INSTALL_MODE" = "remote" ]; then
+    echo "📥 Téléchargement des fichiers depuis GitHub..."
+    
+    # Télécharger les fichiers principaux
+    echo "  📄 Téléchargement de arr-monitor.py..."
+    curl -sL "$GITHUB_RAW_URL/arr-monitor.py" -o arr-monitor.py
+    
+    echo "  📄 Téléchargement de requirements.txt..."
+    curl -sL "$GITHUB_RAW_URL/requirements.txt" -o requirements.txt
+    
+    echo "  📄 Téléchargement de config.yaml..."
+    curl -sL "$GITHUB_RAW_URL/config.yaml" -o config.yaml.tmp
+    
+    echo "  📄 Téléchargement de arr-monitor.service..."
+    curl -sL "$GITHUB_RAW_URL/arr-monitor.service" -o arr-monitor.service.tmp
+    
+    # Vérifier que les téléchargements ont réussi
+    if [ ! -f "arr-monitor.py" ] || [ ! -f "requirements.txt" ] || [ ! -f "config.yaml.tmp" ]; then
+        echo "❌ Erreur lors du téléchargement des fichiers depuis GitHub"
+        echo "� Vérifiez votre connexion internet et réessayez"
+        exit 1
+    fi
+    
+    # Créer le répertoire config et déplacer le fichier
+    mkdir -p config
+    mv config.yaml.tmp config/config.yaml
+    
+    echo "✅ Fichiers téléchargés avec succès"
+else
+    echo "�📋 Copie des fichiers depuis $SOURCE_DIR vers $INSTALL_DIR..."
+    cp "$SOURCE_DIR/arr-monitor.py" ./
+    cp "$SOURCE_DIR/requirements.txt" ./
+    
+    # Création du répertoire config et copie
+    mkdir -p config
+    cp "$SOURCE_DIR/config.yaml" config/
+    
+    # Copier le fichier service pour installation locale
+    if [ -f "$SOURCE_DIR/arr-monitor.service" ]; then
+        cp "$SOURCE_DIR/arr-monitor.service" arr-monitor.service.tmp
+    fi
+fi
 
 # Application automatique de la correction du bug get_queue si nécessaire
 echo "🔧 Vérification et correction du code Python..."
@@ -577,7 +608,20 @@ fi
 INSTALL_SERVICE=${INSTALL_SERVICE:-N}
 
 if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
-    if [ -f "$SOURCE_DIR/arr-monitor.service" ]; then
+    # Vérifier la disponibilité du fichier service
+    SERVICE_FILE=""
+    if [ -f "arr-monitor.service.tmp" ]; then
+        SERVICE_FILE="arr-monitor.service.tmp"
+    elif [ "$INSTALL_MODE" = "remote" ]; then
+        # Télécharger le fichier service si pas encore fait
+        echo "📥 Téléchargement du fichier service systemd..."
+        curl -sL "$GITHUB_RAW_URL/arr-monitor.service" -o arr-monitor.service.tmp
+        if [ -f "arr-monitor.service.tmp" ]; then
+            SERVICE_FILE="arr-monitor.service.tmp"
+        fi
+    fi
+    
+    if [ -n "$SERVICE_FILE" ]; then
         echo "📋 Installation du service systemd..."
         
         # Vérifier que l'environnement virtuel fonctionne
@@ -612,17 +656,18 @@ if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
         fi
         
         # Copie et modification du fichier service avec chemin absolu
-        cp "$SOURCE_DIR/arr-monitor.service" arr-monitor.service.tmp
-        sed -i.bak "s|%USER%|$USER|g" arr-monitor.service.tmp
-        sed -i.bak2 "s|%INSTALL_DIR%|$INSTALL_DIR|g" arr-monitor.service.tmp
+        cp "$SERVICE_FILE" arr-monitor.service.final
+        sed -i.bak "s|%USER%|$USER|g" arr-monitor.service.final
+        sed -i.bak2 "s|%INSTALL_DIR%|$INSTALL_DIR|g" arr-monitor.service.final
         
         # Installation du service
-        sudo cp arr-monitor.service.tmp /etc/systemd/system/arr-monitor.service
+        sudo cp arr-monitor.service.final /etc/systemd/system/arr-monitor.service
         sudo systemctl daemon-reload
         sudo systemctl enable arr-monitor
         
         # Nettoyer les fichiers temporaires
-        rm -f arr-monitor.service.tmp*
+        rm -f arr-monitor.service.final*
+        rm -f arr-monitor.service.tmp
         
         echo "✅ Service systemd installé et activé"
         echo "   sudo systemctl start arr-monitor    # Démarrer"
@@ -640,7 +685,8 @@ if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
             sudo journalctl -u arr-monitor -n 10 --no-pager
         fi
     else
-        echo "⚠️  Fichier service non trouvé : $SOURCE_DIR/arr-monitor.service"
+        echo "⚠️  Fichier service non disponible"
+        echo "💡 Vous pouvez créer le service manuellement avec les instructions ci-dessous"
     fi
 else
     echo "📋 Instructions pour installation manuelle du service :"

@@ -55,7 +55,7 @@
 ### **Installation Automatique (Recommandée)**
 
 ```bash
-# Installation en une ligne
+# Installation en une ligne depuis n'importe où
 curl -sL https://raw.githubusercontent.com/kesurof/Arr-Monitor/main/install-arr.sh | bash
 ```
 
@@ -77,6 +77,22 @@ chmod +x install-arr.sh
 # Mise à jour automatique (préserve la configuration)
 curl -sL https://raw.githubusercontent.com/kesurof/Arr-Monitor/main/install-arr.sh | bash -s -- --update
 ```
+
+### **🎯 Modes d'Installation**
+
+Le script d'installation détecte automatiquement le mode approprié :
+
+#### **📥 Mode Distant (curl)**
+- **Téléchargement automatique** depuis GitHub
+- **Aucun clonage** requis
+- **Installation depuis n'importe où**
+- **Toujours à jour** avec la dernière version
+
+#### **📁 Mode Local (git clone)**  
+- **Fichiers locaux** déjà présents
+- **Installation hors ligne** possible
+- **Développement** et modifications locales
+- **Version spécifique** du repository
 
 ### **🎯 Détection Automatique**
 
