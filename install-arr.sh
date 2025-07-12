@@ -124,39 +124,79 @@ fi
 detect_containers() {
     echo "🔍 Détection automatique des conteneurs..."
     
-    # Détection Sonarr
+    # Variables globales pour la détection
     SONARR_DETECTED=""
-    SONARR_PORT=""
+    RADARR_DETECTED=""
+    
     if command -v docker &> /dev/null && docker ps &> /dev/null; then
-        # Recherche conteneur Sonarr (plus robuste)
-        SONARR_CONTAINERS=$(docker ps --format "{{.Names}}\t{{.Ports}}" | grep -i sonarr)
+        # Recherche conteneur Sonarr
+        SONARR_CONTAINERS=$(docker ps --format "{{.Names}}" | grep -i sonarr)
         if [ -n "$SONARR_CONTAINERS" ]; then
-            while IFS=$'\t' read -r name ports; do
-                # Extraction du port externe
-                SONARR_PORT=$(echo "$ports" | grep -o '0\.0\.0\.0:[0-9]*->8989' | cut -d':' -f2 | cut -d'-' -f1)
-                if [ -n "$SONARR_PORT" ]; then
-                    SONARR_DETECTED="http://localhost:$SONARR_PORT"
-                    echo "  ✅ Sonarr détecté: $name -> $SONARR_DETECTED"
-                    break
+            while read -r container; do
+                if [ -n "$container" ]; then
+                    # Méthode 1: Récupération IP du conteneur (réseau traefik_proxy)
+                    SONARR_IP=$(docker inspect "$container" --format='{{.NetworkSettings.Networks.traefik_proxy.IPAddress}}' 2>/dev/null)
+                    if [ -n "$SONARR_IP" ] && [ "$SONARR_IP" != "<no value>" ]; then
+                        SONARR_DETECTED="http://$SONARR_IP:8989"
+                        echo "  ✅ Sonarr détecté via IP container: $container -> $SONARR_DETECTED"
+                        break
+                    fi
+                    
+                    # Méthode 2: Récupération IP du réseau par défaut
+                    if [ -z "$SONARR_IP" ]; then
+                        SONARR_IP=$(docker inspect "$container" --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null | head -1)
+                        if [ -n "$SONARR_IP" ] && [ "$SONARR_IP" != "<no value>" ]; then
+                            SONARR_DETECTED="http://$SONARR_IP:8989"
+                            echo "  ✅ Sonarr détecté via IP réseau: $container -> $SONARR_DETECTED"
+                            break
+                        fi
+                    fi
+                    
+                    # Méthode 3: Port mapping (fallback)
+                    if [ -z "$SONARR_DETECTED" ]; then
+                        SONARR_PORT=$(docker port "$container" 8989/tcp 2>/dev/null | cut -d':' -f2)
+                        if [ -n "$SONARR_PORT" ]; then
+                            SONARR_DETECTED="http://localhost:$SONARR_PORT"
+                            echo "  ✅ Sonarr détecté via port mapping: $container -> $SONARR_DETECTED"
+                            break
+                        fi
+                    fi
                 fi
             done <<< "$SONARR_CONTAINERS"
         fi
-    fi
-    
-    # Détection Radarr
-    RADARR_DETECTED=""
-    RADARR_PORT=""
-    if command -v docker &> /dev/null && docker ps &> /dev/null; then
-        # Recherche conteneur Radarr (plus robuste)
-        RADARR_CONTAINERS=$(docker ps --format "{{.Names}}\t{{.Ports}}" | grep -i radarr)
+        
+        # Recherche conteneur Radarr (même logique)
+        RADARR_CONTAINERS=$(docker ps --format "{{.Names}}" | grep -i radarr)
         if [ -n "$RADARR_CONTAINERS" ]; then
-            while IFS=$'\t' read -r name ports; do
-                # Extraction du port externe
-                RADARR_PORT=$(echo "$ports" | grep -o '0\.0\.0\.0:[0-9]*->7878' | cut -d':' -f2 | cut -d'-' -f1)
-                if [ -n "$RADARR_PORT" ]; then
-                    RADARR_DETECTED="http://localhost:$RADARR_PORT"
-                    echo "  ✅ Radarr détecté: $name -> $RADARR_DETECTED"
-                    break
+            while read -r container; do
+                if [ -n "$container" ]; then
+                    # Méthode 1: Récupération IP du conteneur (réseau traefik_proxy)
+                    RADARR_IP=$(docker inspect "$container" --format='{{.NetworkSettings.Networks.traefik_proxy.IPAddress}}' 2>/dev/null)
+                    if [ -n "$RADARR_IP" ] && [ "$RADARR_IP" != "<no value>" ]; then
+                        RADARR_DETECTED="http://$RADARR_IP:7878"
+                        echo "  ✅ Radarr détecté via IP container: $container -> $RADARR_DETECTED"
+                        break
+                    fi
+                    
+                    # Méthode 2: Récupération IP du réseau par défaut
+                    if [ -z "$RADARR_IP" ]; then
+                        RADARR_IP=$(docker inspect "$container" --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null | head -1)
+                        if [ -n "$RADARR_IP" ] && [ "$RADARR_IP" != "<no value>" ]; then
+                            RADARR_DETECTED="http://$RADARR_IP:7878"
+                            echo "  ✅ Radarr détecté via IP réseau: $container -> $RADARR_DETECTED"
+                            break
+                        fi
+                    fi
+                    
+                    # Méthode 3: Port mapping (fallback)
+                    if [ -z "$RADARR_DETECTED" ]; then
+                        RADARR_PORT=$(docker port "$container" 7878/tcp 2>/dev/null | cut -d':' -f2)
+                        if [ -n "$RADARR_PORT" ]; then
+                            RADARR_DETECTED="http://localhost:$RADARR_PORT"
+                            echo "  ✅ Radarr détecté via port mapping: $container -> $RADARR_DETECTED"
+                            break
+                        fi
+                    fi
                 fi
             done <<< "$RADARR_CONTAINERS"
         fi
@@ -193,18 +233,36 @@ detect_containers() {
 detect_api_keys() {
     echo "🔑 Recherche des clés API..."
     
-    # Recherche clé API Sonarr
+    # Variables globales pour la détection
     SONARR_API_DETECTED=""
+    RADARR_API_DETECTED=""
+    
+    # Recherche clé API Sonarr
     if command -v docker &> /dev/null && docker ps &> /dev/null; then
         SONARR_CONTAINERS=$(docker ps --format "{{.Names}}" | grep -i sonarr)
         if [ -n "$SONARR_CONTAINERS" ]; then
             while read -r container; do
                 if [ -n "$container" ]; then
-                    # Tente de récupérer la clé API depuis le conteneur
-                    SONARR_API_DETECTED=$(docker exec "$container" sh -c 'cat /config/config.xml 2>/dev/null || cat /app/config.xml 2>/dev/null || cat /data/config.xml 2>/dev/null' | grep -o '<ApiKey>[^<]*</ApiKey>' | sed 's/<[^>]*>//g' | head -1 2>/dev/null)
-                    if [ -n "$SONARR_API_DETECTED" ]; then
-                        echo "  🔑 Clé API Sonarr détectée depuis $container: ${SONARR_API_DETECTED:0:8}..."
-                        break
+                    # Méthode 1: Via chemin SETTINGS_STORAGE (comme dans votre code)
+                    SETTINGS_STORAGE=${SETTINGS_STORAGE:-/opt/seedbox/docker}
+                    CURRENT_USER=${USER:-kesurof}
+                    CONFIG_PATH="$SETTINGS_STORAGE/docker/$CURRENT_USER/sonarr/config/config.xml"
+                    
+                    if [ -f "$CONFIG_PATH" ] && [ -r "$CONFIG_PATH" ]; then
+                        SONARR_API_DETECTED=$(sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' "$CONFIG_PATH" 2>/dev/null | head -1)
+                        if [ -n "$SONARR_API_DETECTED" ]; then
+                            echo "  🔑 Clé API Sonarr trouvée via SETTINGS_STORAGE: ${SONARR_API_DETECTED:0:8}..."
+                            break
+                        fi
+                    fi
+                    
+                    # Méthode 2: Via conteneur Docker (chemins standards)
+                    if [ -z "$SONARR_API_DETECTED" ]; then
+                        SONARR_API_DETECTED=$(docker exec "$container" sh -c 'cat /config/config.xml 2>/dev/null || cat /app/config.xml 2>/dev/null || cat /data/config.xml 2>/dev/null' | sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' | head -1 2>/dev/null)
+                        if [ -n "$SONARR_API_DETECTED" ]; then
+                            echo "  🔑 Clé API Sonarr détectée depuis conteneur $container: ${SONARR_API_DETECTED:0:8}..."
+                            break
+                        fi
                     fi
                 fi
             done <<< "$SONARR_CONTAINERS"
@@ -212,28 +270,42 @@ detect_api_keys() {
     fi
     
     # Recherche clé API Radarr
-    RADARR_API_DETECTED=""
     if command -v docker &> /dev/null && docker ps &> /dev/null; then
         RADARR_CONTAINERS=$(docker ps --format "{{.Names}}" | grep -i radarr)
         if [ -n "$RADARR_CONTAINERS" ]; then
             while read -r container; do
                 if [ -n "$container" ]; then
-                    # Tente de récupérer la clé API depuis le conteneur
-                    RADARR_API_DETECTED=$(docker exec "$container" sh -c 'cat /config/config.xml 2>/dev/null || cat /app/config.xml 2>/dev/null || cat /data/config.xml 2>/dev/null' | grep -o '<ApiKey>[^<]*</ApiKey>' | sed 's/<[^>]*>//g' | head -1 2>/dev/null)
-                    if [ -n "$RADARR_API_DETECTED" ]; then
-                        echo "  🔑 Clé API Radarr détectée depuis $container: ${RADARR_API_DETECTED:0:8}..."
-                        break
+                    # Méthode 1: Via chemin SETTINGS_STORAGE (comme dans votre code)
+                    SETTINGS_STORAGE=${SETTINGS_STORAGE:-/opt/seedbox/docker}
+                    CURRENT_USER=${USER:-kesurof}
+                    CONFIG_PATH="$SETTINGS_STORAGE/docker/$CURRENT_USER/radarr/config/config.xml"
+                    
+                    if [ -f "$CONFIG_PATH" ] && [ -r "$CONFIG_PATH" ]; then
+                        RADARR_API_DETECTED=$(sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' "$CONFIG_PATH" 2>/dev/null | head -1)
+                        if [ -n "$RADARR_API_DETECTED" ]; then
+                            echo "  🔑 Clé API Radarr trouvée via SETTINGS_STORAGE: ${RADARR_API_DETECTED:0:8}..."
+                            break
+                        fi
+                    fi
+                    
+                    # Méthode 2: Via conteneur Docker (chemins standards)
+                    if [ -z "$RADARR_API_DETECTED" ]; then
+                        RADARR_API_DETECTED=$(docker exec "$container" sh -c 'cat /config/config.xml 2>/dev/null || cat /app/config.xml 2>/dev/null || cat /data/config.xml 2>/dev/null' | sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' | head -1 2>/dev/null)
+                        if [ -n "$RADARR_API_DETECTED" ]; then
+                            echo "  🔑 Clé API Radarr détectée depuis conteneur $container: ${RADARR_API_DETECTED:0:8}..."
+                            break
+                        fi
                     fi
                 fi
             done <<< "$RADARR_CONTAINERS"
         fi
     fi
     
-    # Recherche dans les fichiers locaux communs
+    # Recherche dans les fichiers locaux communs (fallback)
     if [ -z "$SONARR_API_DETECTED" ]; then
         for config_path in "/home/$USER/.config/Sonarr/config.xml" "/opt/Sonarr/config.xml" "/var/lib/sonarr/config.xml" "/usr/local/share/sonarr/config.xml"; do
             if [ -f "$config_path" ] && [ -r "$config_path" ]; then
-                SONARR_API_DETECTED=$(grep -o '<ApiKey>[^<]*</ApiKey>' "$config_path" 2>/dev/null | sed 's/<[^>]*>//g' | head -1)
+                SONARR_API_DETECTED=$(sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' "$config_path" 2>/dev/null | head -1)
                 if [ -n "$SONARR_API_DETECTED" ]; then
                     echo "  🔑 Clé API Sonarr trouvée dans $config_path: ${SONARR_API_DETECTED:0:8}..."
                     break
@@ -245,7 +317,7 @@ detect_api_keys() {
     if [ -z "$RADARR_API_DETECTED" ]; then
         for config_path in "/home/$USER/.config/Radarr/config.xml" "/opt/Radarr/config.xml" "/var/lib/radarr/config.xml" "/usr/local/share/radarr/config.xml"; do
             if [ -f "$config_path" ] && [ -r "$config_path" ]; then
-                RADARR_API_DETECTED=$(grep -o '<ApiKey>[^<]*</ApiKey>' "$config_path" 2>/dev/null | sed 's/<[^>]*>//g' | head -1)
+                RADARR_API_DETECTED=$(sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' "$config_path" 2>/dev/null | head -1)
                 if [ -n "$RADARR_API_DETECTED" ]; then
                     echo "  🔑 Clé API Radarr trouvée dans $config_path: ${RADARR_API_DETECTED:0:8}..."
                     break
@@ -257,6 +329,7 @@ detect_api_keys() {
     if [ -z "$SONARR_API_DETECTED" ] && [ -z "$RADARR_API_DETECTED" ]; then
         echo "  ⚠️  Aucune clé API détectée automatiquement"
         echo "  💡 Les clés API devront être saisies manuellement"
+        echo "  💡 Vérifiez les variables d'environnement SETTINGS_STORAGE si vous utilisez une structure personnalisée"
     fi
 }
 
