@@ -1,14 +1,19 @@
 [Unit]
 Description=Arr Monitor - Surveillance Sonarr/Radarr
 After=network.target
+Wants=network.target
 
 [Service]
 Type=simple
 User=%USER%
+Group=%USER%
 WorkingDirectory=%INSTALL_DIR%
+Environment=PATH=%INSTALL_DIR%/venv/bin
 ExecStart=%INSTALL_DIR%/venv/bin/python %INSTALL_DIR%/arr-monitor.py --config %INSTALL_DIR%/config/config.yaml.local
 Restart=always
 RestartSec=30
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

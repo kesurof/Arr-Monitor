@@ -533,7 +533,14 @@ if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
     if [ -f "$SOURCE_DIR/arr-monitor.service" ]; then
         echo "📋 Installation du service systemd..."
         
-        # Copie et modification du fichier service
+        # Vérifier que l'environnement virtuel fonctionne
+        if ! "$INSTALL_DIR/venv/bin/python" -c "import yaml, requests" &> /dev/null; then
+            echo "⚠️  Problème avec l'environnement virtuel, réinstallation des dépendances..."
+            source venv/bin/activate
+            pip install -r requirements.txt
+        fi
+        
+        # Copie et modification du fichier service avec chemin absolu
         cp "$SOURCE_DIR/arr-monitor.service" arr-monitor.service.tmp
         sed -i.bak "s|%USER%|$USER|g" arr-monitor.service.tmp
         sed -i.bak2 "s|%INSTALL_DIR%|$INSTALL_DIR|g" arr-monitor.service.tmp
@@ -550,6 +557,17 @@ if [[ $INSTALL_SERVICE =~ ^[Yy]$ ]]; then
         echo "   sudo systemctl start arr-monitor    # Démarrer"
         echo "   sudo systemctl status arr-monitor   # Vérifier le statut"
         echo "   sudo journalctl -u arr-monitor -f   # Voir les logs"
+        
+        # Test du service
+        echo ""
+        echo "🧪 Test du service systemd..."
+        if sudo systemctl start arr-monitor && sleep 2 && sudo systemctl is-active --quiet arr-monitor; then
+            echo "✅ Service démarré avec succès"
+        else
+            echo "⚠️  Problème de démarrage du service"
+            echo "📋 Vérification des logs :"
+            sudo journalctl -u arr-monitor -n 10 --no-pager
+        fi
     else
         echo "⚠️  Fichier service non trouvé : $SOURCE_DIR/arr-monitor.service"
     fi
