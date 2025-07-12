@@ -76,6 +76,11 @@ chmod +x install-arr.sh
 ```bash
 # Mise à jour automatique (préserve la configuration)
 curl -sL https://raw.githubusercontent.com/kesurof/Arr-Monitor/main/install-arr.sh | bash -s -- --update
+
+# ⚠️  IMPORTANT : La mise à jour doit être exécutée depuis le répertoire d'installation
+# Si vous n'êtes pas dans le bon répertoire, allez d'abord dans :
+# cd /home/$USER/scripts/Arr-Monitor
+# puis relancez la commande de mise à jour
 ```
 
 ### **🎯 Modes d'Installation**
@@ -221,6 +226,11 @@ grep "ERROR\|CRITICAL" logs/arr-monitor.log
 ```bash
 # Mise à jour automatique (recommandée)
 curl -sL https://raw.githubusercontent.com/kesurof/Arr-Monitor/main/install-arr.sh | bash -s -- --update
+
+# ⚠️  REMARQUE IMPORTANTE :
+# - Pour une PREMIÈRE installation : peut être exécutée depuis n'importe où
+# - Pour une MISE À JOUR : doit être exécutée depuis le répertoire d'installation
+#   cd /home/$USER/scripts/Arr-Monitor
 
 # Mise à jour manuelle
 cd Arr-Monitor

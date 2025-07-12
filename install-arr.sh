@@ -532,17 +532,17 @@ if [ "$CONFIG_CREATED" = true ]; then
     echo "📝 Mise à jour de la configuration..."
     
     if [[ $ENABLE_SONARR =~ ^[Yy]$ ]]; then
-        sed -i.bak "s|url: \"http://localhost:8989\"|url: \"$SONARR_URL\"|" config/config.yaml.local
+        sed -i.bak1 "s|url: \"http://localhost:8989\"|url: \"$SONARR_URL\"|" config/config.yaml.local
         sed -i.bak2 "s|api_key: \"your_sonarr_api_key\"|api_key: \"$SONARR_API\"|" config/config.yaml.local
     else
-        sed -i.bak "s|enabled: true|enabled: false|" config/config.yaml.local
+        sed -i.bak1 "/sonarr:/,/radarr:/ s|enabled: true|enabled: false|" config/config.yaml.local
     fi
     
     if [[ $ENABLE_RADARR =~ ^[Yy]$ ]]; then
         sed -i.bak3 "s|url: \"http://localhost:7878\"|url: \"$RADARR_URL\"|" config/config.yaml.local
         sed -i.bak4 "s|api_key: \"your_radarr_api_key\"|api_key: \"$RADARR_API\"|" config/config.yaml.local
     else
-        sed -i.bak3 "/radarr:/,/check_stuck:/ s|enabled: true|enabled: false|" config/config.yaml.local
+        sed -i.bak3 "/radarr:/,/monitoring:/ s|enabled: true|enabled: false|" config/config.yaml.local
     fi
     
     if [[ $AUTO_ACTIONS =~ ^[Nn]$ ]]; then
@@ -556,7 +556,7 @@ if [ "$CONFIG_CREATED" = true ]; then
     # Test automatique après configuration
     echo ""
     echo "🧪 Test automatique de l'installation..."
-    if python arr-monitor.py --test --config config/config.yaml.local; then
+    if python arr-monitor.py --test --config config/config.yaml.local 2>/dev/null; then
         echo "✅ Test réussi - Installation fonctionnelle !"
     else
         echo "⚠️  Test échoué - Vérifiez la configuration"
@@ -575,23 +575,26 @@ else
     echo "✅ Installation terminée avec succès !"
 fi
 echo ""
+echo "🎯 IMPORTANT : Toutes les commandes doivent être exécutées depuis le répertoire d'installation :"
+echo "   cd $INSTALL_DIR"
+echo ""
 echo "📋 Utilisation :"
 echo "   cd $INSTALL_DIR"
-echo "   source venv/bin/activate"
+echo "   source venv/bin/activate  # Optionnel si lien symbolique"
 echo "   python arr-monitor.py --config config/config.yaml.local"
 echo ""
 echo "📋 Commandes utiles :"
 echo "   # Test unique"
-echo "   python arr-monitor.py --test --config config/config.yaml.local"
+echo "   cd $INSTALL_DIR && python arr-monitor.py --test --config config/config.yaml.local"
 echo ""
 echo "   # Mode debug"
-echo "   python arr-monitor.py --debug --config config/config.yaml.local"
+echo "   cd $INSTALL_DIR && python arr-monitor.py --debug --config config/config.yaml.local"
 echo ""
 echo "   # Simulation sans actions"
-echo "   python arr-monitor.py --dry-run --config config/config.yaml.local"
+echo "   cd $INSTALL_DIR && python arr-monitor.py --dry-run --config config/config.yaml.local"
 echo ""
 echo "   # Voir les logs"
-echo "   tail -f logs/arr-monitor.log"
+echo "   cd $INSTALL_DIR && tail -f logs/arr-monitor.log"
 echo ""
 echo "📁 Configuration : $INSTALL_DIR/config/config.yaml.local"
 echo "📝 Logs : $INSTALL_DIR/logs/arr-monitor.log"
