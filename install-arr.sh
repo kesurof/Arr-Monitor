@@ -120,10 +120,122 @@ else
     CONFIG_CREATED=false
 fi
 
+# Fonction de détection automatique des conteneurs
+detect_containers() {
+    echo "🔍 Détection automatique des conteneurs..."
+    
+    # Détection Sonarr
+    SONARR_DETECTED=""
+    SONARR_PORT=""
+    if command -v docker &> /dev/null; then
+        # Recherche conteneur Sonarr
+        SONARR_CONTAINER=$(docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -i sonarr | head -1)
+        if [ -n "$SONARR_CONTAINER" ]; then
+            SONARR_NAME=$(echo "$SONARR_CONTAINER" | awk '{print $1}')
+            SONARR_PORT=$(echo "$SONARR_CONTAINER" | grep -o '0.0.0.0:[0-9]*->8989' | cut -d':' -f2 | cut -d'-' -f1)
+            if [ -n "$SONARR_PORT" ]; then
+                SONARR_DETECTED="http://localhost:$SONARR_PORT"
+                echo "  ✅ Sonarr détecté: $SONARR_NAME -> $SONARR_DETECTED"
+            fi
+        fi
+    fi
+    
+    # Détection Radarr
+    RADARR_DETECTED=""
+    RADARR_PORT=""
+    if command -v docker &> /dev/null; then
+        # Recherche conteneur Radarr
+        RADARR_CONTAINER=$(docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -i radarr | head -1)
+        if [ -n "$RADARR_CONTAINER" ]; then
+            RADARR_NAME=$(echo "$RADARR_CONTAINER" | awk '{print $1}')
+            RADARR_PORT=$(echo "$RADARR_CONTAINER" | grep -o '0.0.0.0:[0-9]*->7878' | cut -d':' -f2 | cut -d'-' -f1)
+            if [ -n "$RADARR_PORT" ]; then
+                RADARR_DETECTED="http://localhost:$RADARR_PORT"
+                echo "  ✅ Radarr détecté: $RADARR_NAME -> $RADARR_DETECTED"
+            fi
+        fi
+    fi
+    
+    # Vérification des processus locaux si Docker ne trouve rien
+    if [ -z "$SONARR_DETECTED" ] && netstat -tlnp 2>/dev/null | grep -q ":8989 "; then
+        SONARR_DETECTED="http://localhost:8989"
+        echo "  ✅ Sonarr détecté (processus local): $SONARR_DETECTED"
+    fi
+    
+    if [ -z "$RADARR_DETECTED" ] && netstat -tlnp 2>/dev/null | grep -q ":7878 "; then
+        RADARR_DETECTED="http://localhost:7878"
+        echo "  ✅ Radarr détecté (processus local): $RADARR_DETECTED"
+    fi
+    
+    if [ -z "$SONARR_DETECTED" ] && [ -z "$RADARR_DETECTED" ]; then
+        echo "  ⚠️  Aucun conteneur Sonarr/Radarr détecté automatiquement"
+    fi
+}
+
+# Fonction pour détecter les clés API
+detect_api_keys() {
+    echo "🔑 Recherche des clés API..."
+    
+    # Recherche clé API Sonarr
+    SONARR_API_DETECTED=""
+    if command -v docker &> /dev/null; then
+        SONARR_CONTAINER=$(docker ps --format "{{.Names}}" | grep -i sonarr | head -1)
+        if [ -n "$SONARR_CONTAINER" ]; then
+            # Tente de récupérer la clé API depuis le conteneur
+            SONARR_API_DETECTED=$(docker exec "$SONARR_CONTAINER" cat /config/config.xml 2>/dev/null | grep -o '<ApiKey>[^<]*</ApiKey>' | sed 's/<[^>]*>//g' | head -1)
+            if [ -n "$SONARR_API_DETECTED" ]; then
+                echo "  🔑 Clé API Sonarr détectée: ${SONARR_API_DETECTED:0:8}..."
+            fi
+        fi
+    fi
+    
+    # Recherche clé API Radarr
+    RADARR_API_DETECTED=""
+    if command -v docker &> /dev/null; then
+        RADARR_CONTAINER=$(docker ps --format "{{.Names}}" | grep -i radarr | head -1)
+        if [ -n "$RADARR_CONTAINER" ]; then
+            # Tente de récupérer la clé API depuis le conteneur
+            RADARR_API_DETECTED=$(docker exec "$RADARR_CONTAINER" cat /config/config.xml 2>/dev/null | grep -o '<ApiKey>[^<]*</ApiKey>' | sed 's/<[^>]*>//g' | head -1)
+            if [ -n "$RADARR_API_DETECTED" ]; then
+                echo "  🔑 Clé API Radarr détectée: ${RADARR_API_DETECTED:0:8}..."
+            fi
+        fi
+    fi
+    
+    # Recherche dans les fichiers locaux communs
+    if [ -z "$SONARR_API_DETECTED" ]; then
+        for config_path in "/home/$USER/.config/Sonarr/config.xml" "/opt/Sonarr/config.xml" "/var/lib/sonarr/config.xml"; do
+            if [ -f "$config_path" ]; then
+                SONARR_API_DETECTED=$(grep -o '<ApiKey>[^<]*</ApiKey>' "$config_path" 2>/dev/null | sed 's/<[^>]*>//g' | head -1)
+                if [ -n "$SONARR_API_DETECTED" ]; then
+                    echo "  🔑 Clé API Sonarr trouvée dans $config_path"
+                    break
+                fi
+            fi
+        done
+    fi
+    
+    if [ -z "$RADARR_API_DETECTED" ]; then
+        for config_path in "/home/$USER/.config/Radarr/config.xml" "/opt/Radarr/config.xml" "/var/lib/radarr/config.xml"; do
+            if [ -f "$config_path" ]; then
+                RADARR_API_DETECTED=$(grep -o '<ApiKey>[^<]*</ApiKey>' "$config_path" 2>/dev/null | sed 's/<[^>]*>//g' | head -1)
+                if [ -n "$RADARR_API_DETECTED" ]; then
+                    echo "  🔑 Clé API Radarr trouvée dans $config_path"
+                    break
+                fi
+            fi
+        done
+    fi
+}
+
 # Configuration interactive seulement si nouveau fichier créé
 if [ "$CONFIG_CREATED" = true ]; then
     echo ""
     echo "📋 Configuration des applications :"
+    
+    # Détection automatique
+    detect_containers
+    detect_api_keys
     
     # Configuration Sonarr
     echo ""
@@ -131,10 +243,16 @@ if [ "$CONFIG_CREATED" = true ]; then
     ENABLE_SONARR=${ENABLE_SONARR:-Y}
     
     if [[ $ENABLE_SONARR =~ ^[Yy]$ ]]; then
-        read -p "📺 URL Sonarr [http://localhost:8989] : " SONARR_URL
-        SONARR_URL=${SONARR_URL:-http://localhost:8989}
+        DEFAULT_SONARR_URL=${SONARR_DETECTED:-http://localhost:8989}
+        read -p "📺 URL Sonarr [$DEFAULT_SONARR_URL] : " SONARR_URL
+        SONARR_URL=${SONARR_URL:-$DEFAULT_SONARR_URL}
         
-        read -p "📺 Clé API Sonarr : " SONARR_API
+        if [ -n "$SONARR_API_DETECTED" ]; then
+            read -p "📺 Clé API Sonarr [Détectée: ${SONARR_API_DETECTED:0:8}...] : " SONARR_API
+            SONARR_API=${SONARR_API:-$SONARR_API_DETECTED}
+        else
+            read -p "📺 Clé API Sonarr : " SONARR_API
+        fi
         
         # Test de connexion Sonarr
         if [ -n "$SONARR_API" ]; then
@@ -153,10 +271,16 @@ if [ "$CONFIG_CREATED" = true ]; then
     ENABLE_RADARR=${ENABLE_RADARR:-Y}
     
     if [[ $ENABLE_RADARR =~ ^[Yy]$ ]]; then
-        read -p "🎬 URL Radarr [http://localhost:7878] : " RADARR_URL
-        RADARR_URL=${RADARR_URL:-http://localhost:7878}
+        DEFAULT_RADARR_URL=${RADARR_DETECTED:-http://localhost:7878}
+        read -p "🎬 URL Radarr [$DEFAULT_RADARR_URL] : " RADARR_URL
+        RADARR_URL=${RADARR_URL:-$DEFAULT_RADARR_URL}
         
-        read -p "🎬 Clé API Radarr : " RADARR_API
+        if [ -n "$RADARR_API_DETECTED" ]; then
+            read -p "🎬 Clé API Radarr [Détectée: ${RADARR_API_DETECTED:0:8}...] : " RADARR_API
+            RADARR_API=${RADARR_API:-$RADARR_API_DETECTED}
+        else
+            read -p "🎬 Clé API Radarr : " RADARR_API
+        fi
         
         # Test de connexion Radarr
         if [ -n "$RADARR_API" ]; then
