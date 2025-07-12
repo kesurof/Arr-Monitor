@@ -1,4 +1,6 @@
 # Configuration Arr Monitor - Surveillance Sonarr/Radarr
+# Version: 1.0.0 - Optimisé pour environnement serveur ARM64
+
 applications:
   sonarr:
     enabled: true
@@ -19,8 +21,25 @@ actions:
   max_retries: 3                # Nombre max de tentatives
   notify_failures: true        # Notifier les échecs persistants
 
+privacy:
+  anonymize_logs: true          # Anonymiser les informations sensibles dans les logs
+  hide_ip_addresses: true       # Masquer les adresses IP
+  hide_usernames: true          # Masquer les noms d'utilisateur
+  hide_hostnames: true          # Masquer les noms d'hôte
+
+system:
+  architecture: "auto"          # auto, arm64, amd64
+  optimize_for_arm64: true      # Optimisations spécifiques ARM64
+  extended_timeouts: true       # Timeouts étendus pour serveurs ARM64
+  
+updates:
+  check_on_startup: true        # Vérifier les mises à jour au démarrage
+  auto_download: false          # Téléchargement automatique des mises à jour
+  github_repo: "kesurof/Arr-Monitor"
+
 logging:
   level: "INFO"                 # DEBUG|INFO|WARNING|ERROR
   file: "logs/arr-monitor.log"
   max_size_mb: 10
   backup_count: 5
+  anonymize_sensitive_data: true # Anonymiser les données sensibles dans les logs

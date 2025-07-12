@@ -2,6 +2,7 @@
 """
 Arr Monitor - Surveillance automatique des erreurs Sonarr/Radarr
 Détecte et corrige automatiquement les téléchargements échoués ou bloqués
+Version: 1.0.0 - Optimisé pour ARM64
 """
 
 import argparse
@@ -9,6 +10,8 @@ import logging
 import time
 import sys
 import os
+import re
+import platform
 from pathlib import Path
 import yaml
 import requests
@@ -20,7 +23,73 @@ class ArrMonitor:
         self.config = self.load_config(config_path)
         self.setup_logging()
         self.session = requests.Session()
+        self.version = "1.0.0"
+        self.anonymize_enabled = self.config.get('privacy', {}).get('anonymize_logs', True)
         
+        # Optimisations ARM64
+        if platform.machine() in ['aarch64', 'arm64']:
+            self.setup_arm64_optimizations()
+        
+        # Vérification des mises à jour au démarrage
+        self.check_for_updates_async()
+        
+    def setup_arm64_optimizations(self):
+        """Optimisations spécifiques pour ARM64"""
+        # Timeout plus élevés pour ARM64
+        self.session.timeout = 15
+        
+        # Headers optimisés pour ARM64
+        self.session.headers.update({
+            'User-Agent': f'Arr-Monitor/{self.version} (ARM64; Linux)'
+        })
+        
+        self.logger.info("🔧 Optimisations ARM64 activées")
+    
+    def check_for_updates_async(self):
+        """Vérifie les mises à jour GitHub en arrière-plan"""
+        try:
+            import subprocess
+            import threading
+            
+            def check_updates():
+                try:
+                    # Utilise le script update_checker en subprocess
+                    result = subprocess.run([
+                        sys.executable, 
+                        os.path.join(os.path.dirname(__file__), 'update_checker.py')
+                    ], capture_output=True, text=True, timeout=10)
+                    
+                    if "Nouvelle version disponible" in result.stdout:
+                        self.logger.info("🆕 Mise à jour disponible ! Lancez le menu pour plus d'infos.")
+                except Exception:
+                    pass  # Ignore les erreurs de vérification silencieusement
+            
+            # Lance la vérification en arrière-plan
+            threading.Thread(target=check_updates, daemon=True).start()
+            
+        except Exception:
+            pass  # Ignore les erreurs d'importation
+    
+    def anonymize_sensitive_data(self, data):
+        """Anonymise les données sensibles dans les logs"""
+        if not self.anonymize_enabled:
+            return data
+            
+        if isinstance(data, str):
+            # Anonymise les adresses IP
+            data = re.sub(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', 'xxx.xxx.xxx.xxx', data)
+            
+            # Anonymise les noms d'utilisateur
+            data = re.sub(r'/home/[^/\s]+', '/home/[USER]', data)
+            
+            # Anonymise les hostnames
+            data = re.sub(r'@[a-zA-Z0-9.-]+', '@[HOSTNAME]', data)
+            
+            # Anonymise les API keys partiellement (garde les 4 premiers caractères)
+            data = re.sub(r'([a-zA-Z0-9]{4})[a-zA-Z0-9]{20,}', r'\1***', data)
+            
+        return data
+    
     def load_config(self, config_path):
         """Charge la configuration depuis le fichier YAML"""
         try:

@@ -1,33 +1,34 @@
-# 🔄 Arr Monitor - Surveillance Sonarr/Radarr
+# � Arr Monitor v1.0.0 - Surveillance Sonarr/Radarr
 
-[![Version](https://img.shields.io/badge/version-2.0-blue.svg)](https://github.com/kesurof/Arr-Monitor)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/kesurof/Arr-Monitor)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](https://docker.com)
+[![ARM64](https://img.shields.io/badge/ARM64-optimized-green.svg)](https://arm.com)
 
 ## 📝 Description
 
-**Arr Monitor** est un outil de surveillance et de gestion automatique des erreurs pour **Sonarr** et **Radarr**. Il surveille les files d'attente, détecte les téléchargements en erreur ou bloqués, et peut automatiquement relancer ou supprimer les éléments problématiques.
+**Arr Monitor** est un outil de surveillance et de gestion automatique optimisé pour les serveurs ARM64. Il surveille Sonarr et Radarr, détecte les erreurs qBittorrent spécifiques, et applique l'action "Blocklist and Search" pour une résolution intelligente.
 
-### 🎯 **Nouveautés v2.0**
-- ✅ **Détection automatique** des conteneurs Docker
-- ✅ **Extraction automatique** des clés API
-- ✅ **Support environnements virtuels** existants
-- ✅ **Installation zéro-configuration** 
-- ✅ **Service systemd** intégré
-- ✅ **Script de désinstallation** complet
+### 🎯 **Nouveautés v1.0.0**
+- 🔧 **Optimisations ARM64** spécifiques pour votre environnement
+- 🔒 **Anonymisation automatique** des données sensibles
+- 🆕 **Détection des mises à jour** GitHub automatique
+- 🎯 **Menu interactif unifié** avec toutes les fonctions
+- 🚫 **Action "Blocklist and Search"** au lieu du simple retry
+- 📊 **Monitoring système** intégré
 
 ## ✨ Fonctionnalités
 
 ### 🔍 **Surveillance Intelligente**
-- 📊 **Surveillance temps réel** des files d'attente Sonarr/Radarr
-- 🔍 **Détection avancée** des erreurs de téléchargement
-- 🎯 **Identification** des téléchargements bloqués
-- 📈 **Métriques détaillées** et historique
+- 🎯 **Détection spécifique** : "qBittorrent is reporting an error"
+- � **Action intelligente** : Blocklist + Search automatique  
+- 📊 **Surveillance continue** avec intervalle de 5 minutes
+- � **Optimisé ARM64** pour votre serveur
 
 ### ⚡ **Actions Automatiques**
-- 🔄 **Relance automatique** des téléchargements en erreur
-- 🗑️ **Suppression intelligente** des éléments bloqués
+- � **Blocklist automatique** des releases défaillantes
+- 🔍 **Recherche automatique** de nouvelles releases
+- 🎯 **Résolution définitive** au lieu de retry en boucle
 - ⏰ **Seuils configurables** pour chaque action
 - �️ **Modes de fonctionnement** : auto, semi-auto, manuel
 
@@ -80,6 +81,44 @@ cd Arr-Monitor
 # Alternative : mode interactif (choisir "2" pour mise à jour)
 ./install-arr.sh
 ```
+
+### **🚀 Démarrage rapide**
+
+### 🎯 **Méthode recommandée : Menu interactif**
+
+```bash
+# Clone et accès au répertoire
+git clone https://github.com/kesurof/Arr-Monitor.git
+cd Arr-Monitor
+
+# Lancement du menu interactif (détection automatique ARM64)
+./arr-launcher.sh
+```
+
+Le menu vous proposera :
+- 🔄 **Monitoring continu** avec optimisations ARM64
+- 🧪 **Test unique** pour vérifier la configuration  
+- ⚙️ **Configuration** interactive
+- 📊 **État du système** détaillé
+- 🔍 **Vérification des mises à jour** GitHub
+- 🧹 **Nettoyage des logs** avec anonymisation
+- 📋 **Logs temps réel**
+- 🛠️ **Installation systemd** automatique
+
+### 🔧 **Installation classique (si préférée)**
+
+```bash
+# Installation automatique avec systemd
+./install-arr.sh
+```
+
+### 🏗️ **Configuration optimisée ARM64**
+
+Le système détecte automatiquement votre architecture ARM64 et applique :
+- ⏱️ **Timeouts étendus** adaptés aux performances ARM64
+- 🔧 **Headers optimisés** pour les requêtes API
+- 📊 **Monitoring des ressources** spécifique ARM64
+- 🔒 **Anonymisation** automatique des données sensibles
 
 ### **🎯 Modes d'Opération**
 
