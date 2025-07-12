@@ -80,7 +80,16 @@ class ArrMonitor:
             response = self.session.get(f"{url}/api/v3/queue", headers=headers, timeout=10)
             
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                # L'API peut retourner une liste directement ou un objet avec 'records'
+                if isinstance(data, list):
+                    return data
+                elif isinstance(data, dict) and 'records' in data:
+                    return data['records']
+                else:
+                    # Si c'est un autre format, on retourne une liste vide
+                    self.logger.warning(f"⚠️  {app_name} format de queue inattendu : {type(data)}")
+                    return []
             else:
                 self.logger.error(f"❌ {app_name} erreur récupération queue : {response.status_code}")
                 return []

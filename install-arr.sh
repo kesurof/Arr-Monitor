@@ -432,16 +432,6 @@ else
     echo "💡 Pour reconfigurer, supprimez config/config.yaml.local et relancez l'installation"
 fi
 
-# Test de l'installation
-echo ""
-echo "🧪 Test de l'installation..."
-if python arr-monitor.py --test --config config/config.yaml.local; then
-    echo "✅ Test réussi !"
-else
-    echo "⚠️  Test échoué, mais l'installation est terminée"
-    echo "💡 Vérifiez la configuration dans config/config.yaml.local"
-fi
-
 echo ""
 if [ "$IS_UPDATE" = true ]; then
     echo "✅ Mise à jour terminée avec succès !"
