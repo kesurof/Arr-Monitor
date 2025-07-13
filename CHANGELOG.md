@@ -1,5 +1,27 @@
 # 📋 Changelog - Arr Monitor
 
+## [1.1.2] - 2025-07-13
+
+### ✨ Améliorations
+- **🔧 Bashrc simplifié** : Fonction bashrc simplifiée avec accès direct au menu interactif
+- **🧹 Nettoyage automatique intelligent** : Détection et suppression automatique des répertoires temporaires
+- **📁 Installation complète** : Copie automatique de tous les fichiers nécessaires (arr-launcher.sh, update_checker.py, .version)
+- **🛡️ Sécurité renforcée** : Vérifications multiples pour éviter la suppression accidentelle de répertoires importants
+
+### 🐛 Corrections
+- **✅ Résolution problème configuration** : Configuration maintenant créée dans le bon répertoire de destination
+- **✅ Fonction bashrc manquante** : setup_bashrc_function correctement définie avant utilisation
+- **✅ Fichiers manquants** : Tous les fichiers nécessaires sont maintenant copiés lors de l'installation
+
+### 🧹 Nettoyage
+- **🗑️ Suppression fichiers obsolètes** : Suppression de install-arr-new.sh, test-venv-detection.sh, quick-fix.sh
+- **📦 Structure projet nettoyée** : Conservation uniquement des fichiers essentiels
+
+### 🎯 Interface utilisateur
+- **⚡ Commande unique** : `arr-monitor` donne accès direct au menu complet
+- **🔗 Alias simplifiés** : `arrmonitor` et `arr` pour un accès rapide
+- **💡 Messages améliorés** : Instructions claires pour l'utilisation post-installation
+
 ## [1.1.0] - 2025-07-13
 
 ### 🔬 Nouvelles fonctionnalités majeures

@@ -144,12 +144,31 @@ else
 fi
 
 # Maintenant on peut changer de répertoire
+echo "📂 Changement vers le répertoire d'installation : $INSTALL_DIR"
 cd "$INSTALL_DIR"
+echo "📍 Répertoire courant : $(pwd)"
 
 # Copie des fichiers depuis le répertoire source
 echo "📋 Copie des fichiers depuis $SOURCE_DIR vers $INSTALL_DIR..."
 cp "$SOURCE_DIR/arr-monitor.py" ./
 cp "$SOURCE_DIR/requirements.txt" ./
+
+# Copier tous les fichiers nécessaires
+if [ -f "$SOURCE_DIR/arr-launcher.sh" ]; then
+    cp "$SOURCE_DIR/arr-launcher.sh" ./
+    chmod +x arr-launcher.sh
+    echo "✅ arr-launcher.sh copié"
+fi
+
+if [ -f "$SOURCE_DIR/update_checker.py" ]; then
+    cp "$SOURCE_DIR/update_checker.py" ./
+    echo "✅ update_checker.py copié"
+fi
+
+if [ -f "$SOURCE_DIR/.version" ]; then
+    cp "$SOURCE_DIR/.version" ./
+    echo "✅ .version copié"
+fi
 
 # Création du répertoire config et copie
 mkdir -p config
@@ -263,10 +282,14 @@ mkdir -p logs
 
 # Configuration interactive seulement si nouveau fichier créé
 CONFIG_CREATED=false
+echo "📍 Vérification de config.yaml.local dans : $(pwd)"
 if [ ! -f "config/config.yaml.local" ]; then
+    echo "📋 Création de config.yaml.local..."
     cp config/config.yaml config/config.yaml.local
     CONFIG_CREATED=true
+    echo "✅ config.yaml.local créé dans : $(pwd)/config/"
 else
+    echo "✅ config.yaml.local existe déjà dans : $(pwd)/config/"
     CONFIG_CREATED=false
 fi
 
@@ -449,6 +472,7 @@ if [ "$CONFIG_CREATED" = true ]; then
     # Mise à jour du fichier de configuration
     echo ""
     echo "📝 Mise à jour de la configuration..."
+    echo "📍 Configuration modifiée dans : $(pwd)/config/config.yaml.local"
     
     if [[ $ENABLE_SONARR =~ ^[Yy]$ ]]; then
         sed -i.bak1 "s|enabled: false|enabled: true|" config/config.yaml.local
@@ -639,6 +663,49 @@ else
     echo "   sudo journalctl -u arr-monitor -f   # Voir les logs"
 fi
 
+# Fonction pour ajouter la fonction arr-monitor au bashrc
+setup_bashrc_function() {
+    local bashrc_file="$HOME/.bashrc"
+    local function_name="arr-monitor"
+    local script_path="$INSTALL_DIR"
+    
+    echo "🔧 Configuration de la fonction bashrc '$function_name'..."
+    
+    # Vérifier si la fonction existe déjà
+    if grep -q "function $function_name" "$bashrc_file" 2>/dev/null; then
+        echo "📝 Mise à jour de la fonction existante dans $bashrc_file"
+        
+        # Supprimer l'ancienne fonction
+        sed -i '/^# Arr Monitor function$/,/^}$/d' "$bashrc_file" 2>/dev/null || true
+    else
+        echo "📝 Ajout de la nouvelle fonction dans $bashrc_file"
+    fi
+    
+    # Ajouter la nouvelle fonction simplifiée
+    cat >> "$bashrc_file" << EOF
+
+# Arr Monitor function
+function $function_name() {
+    local current_dir="\$(pwd)"
+    cd "$script_path"
+    ./arr-launcher.sh
+    cd "\$current_dir"
+}
+
+# Alias pour compatibilité
+alias arrmonitor='$function_name'
+alias arr='$function_name'
+EOF
+
+    echo "✅ Fonction '$function_name' ajoutée au bashrc"
+    echo "💡 Utilisez les commandes suivantes après 'source ~/.bashrc' :"
+    echo "   • $function_name          # Accès direct au menu interactif"
+    echo "   • arrmonitor              # Alias court"
+    echo "   • arr                     # Alias très court"
+    echo ""
+    echo "🎯 Une seule commande, accès direct au menu complet !"
+}
+
 echo ""
 echo "🎉 Installation terminée !"
 
@@ -666,154 +733,132 @@ if [ "$IS_UPDATE" = false ] && [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
     echo "   Source : $SOURCE_DIR"
     echo "   Destination : $INSTALL_DIR"
     echo ""
-    read -p "🧹 Voulez-vous supprimer le répertoire source maintenant ? [y/N] : " DELETE_SOURCE
-    DELETE_SOURCE=${DELETE_SOURCE:-N}
     
-    if [[ $DELETE_SOURCE =~ ^[Yy]$ ]]; then
-        echo "🗑️  Suppression du répertoire source..."
+    # Fonction de nettoyage automatique
+    cleanup_source_directory() {
+        local source_path="$1"
         
-        # Vérification de sécurité - s'assurer qu'on ne supprime pas un répertoire système
-        case "$SOURCE_DIR" in
+        echo "🧹 Nettoyage automatique du répertoire source..."
+        
+        # Vérifications de sécurité multiples
+        case "$source_path" in
             /|/home|/usr|/etc|/var|/opt|/bin|/sbin|/lib|/lib64)
-                echo "❌ Refus de supprimer un répertoire système : $SOURCE_DIR"
+                echo "❌ Refus de supprimer un répertoire système : $source_path"
+                return 1
                 ;;
             /home/$USER)
-                echo "❌ Refus de supprimer le répertoire home de l'utilisateur : $SOURCE_DIR"
+                echo "❌ Refus de supprimer le répertoire home de l'utilisateur : $source_path"
+                return 1
                 ;;
-            *)
-                # Vérification supplémentaire que le répertoire contient bien les fichiers du projet
-                if [ -f "$SOURCE_DIR/arr-monitor.py" ] && [ -f "$SOURCE_DIR/install-arr.sh" ]; then
-                    echo "🗑️  Suppression de $SOURCE_DIR..."
-                    rm -rf "$SOURCE_DIR"
-                    echo "✅ Répertoire source supprimé avec succès"
-                    echo "💡 Les fichiers sont maintenant uniquement dans : $INSTALL_DIR"
-                else
-                    echo "❌ Répertoire source ne semble pas contenir les fichiers attendus"
-                    echo "💡 Suppression annulée par sécurité"
-                fi
+            /home/$USER/scripts/*)
+                echo "❌ Refus de supprimer un répertoire dans ~/scripts : $source_path"
+                return 1
                 ;;
         esac
+        
+        # Vérifier que le répertoire contient bien les fichiers du projet
+        if [ ! -f "$source_path/arr-monitor.py" ] || [ ! -f "$source_path/install-arr.sh" ]; then
+            echo "❌ Répertoire source ne semble pas contenir les fichiers attendus"
+            echo "� Suppression annulée par sécurité"
+            return 1
+        fi
+        
+        # Vérifier que ce n'est pas le même répertoire que la destination
+        if [ "$(realpath "$source_path")" = "$(realpath "$INSTALL_DIR")" ]; then
+            echo "❌ Le répertoire source et destination sont identiques"
+            echo "💡 Suppression annulée par sécurité"
+            return 1
+        fi
+        
+        # Vérifier que l'installation a bien réussi
+        if [ ! -f "$INSTALL_DIR/arr-monitor.py" ] || [ ! -f "$INSTALL_DIR/config/config.yaml.local" ]; then
+            echo "❌ Installation dans la destination semble incomplète"
+            echo "💡 Suppression annulée par sécurité"
+            return 1
+        fi
+        
+        echo "🗑️  Suppression de $source_path..."
+        if rm -rf "$source_path"; then
+            echo "✅ Répertoire source supprimé avec succès"
+            echo "💡 Les fichiers sont maintenant uniquement dans : $INSTALL_DIR"
+            return 0
+        else
+            echo "❌ Erreur lors de la suppression du répertoire source"
+            return 1
+        fi
+    }
+    
+    # Détection automatique des répertoires temporaires typiques
+    AUTO_CLEANUP=false
+    case "$SOURCE_DIR" in
+        /tmp/*)
+            echo "🔍 Répertoire temporaire détecté (/tmp)"
+            AUTO_CLEANUP=true
+            ;;
+        /home/$USER/Arr-Monitor)
+            echo "🔍 Répertoire de téléchargement typique détecté"
+            AUTO_CLEANUP=true
+            ;;
+        /home/$USER/Downloads/*)
+            echo "🔍 Répertoire de téléchargements détecté"
+            AUTO_CLEANUP=true
+            ;;
+    esac
+    
+    if [ "$AUTO_CLEANUP" = true ]; then
+        echo "💡 Nettoyage automatique recommandé pour ce type de répertoire"
+        read -p "🧹 Voulez-vous supprimer automatiquement le répertoire source ? [Y/n] : " DELETE_SOURCE
+        DELETE_SOURCE=${DELETE_SOURCE:-Y}
+    else
+        read -p "🧹 Voulez-vous supprimer le répertoire source maintenant ? [y/N] : " DELETE_SOURCE
+        DELETE_SOURCE=${DELETE_SOURCE:-N}
+    fi
+    
+    if [[ $DELETE_SOURCE =~ ^[Yy]$ ]]; then
+        if cleanup_source_directory "$SOURCE_DIR"; then
+            echo ""
+            echo "🎉 Installation terminée et nettoyage effectué !"
+            echo "📁 Arr Monitor est maintenant disponible dans : $INSTALL_DIR"
+        else
+            echo ""
+            echo "⚠️  Installation terminée mais nettoyage échoué"
+            echo "📁 Répertoire source conservé : $SOURCE_DIR"
+            echo "💡 Vous pouvez le supprimer manuellement plus tard"
+        fi
     else
         echo "📁 Répertoire source conservé : $SOURCE_DIR"
         echo "💡 Vous pouvez le supprimer manuellement plus tard avec : rm -rf \"$SOURCE_DIR\""
+        echo ""
+        echo "🧹 Pour un nettoyage automatique lors de la prochaine installation :"
+        echo "   cd /tmp && git clone https://github.com/kesurof/Arr-Monitor.git"
+        echo "   cd Arr-Monitor && ./install-arr.sh"
+    fi
+else
+    echo ""
+    echo "🎉 Installation terminée !"
+    
+    # Même en mode update, proposer le nettoyage si c'est un répertoire temporaire
+    if [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
+        case "$SOURCE_DIR" in
+            /tmp/*)
+                echo ""
+                echo "🧹 Nettoyage du répertoire temporaire :"
+                echo "   Source temporaire : $SOURCE_DIR"
+                read -p "🗑️  Supprimer le répertoire temporaire ? [Y/n] : " DELETE_TEMP
+                DELETE_TEMP=${DELETE_TEMP:-Y}
+                
+                if [[ $DELETE_TEMP =~ ^[Yy]$ ]]; then
+                    echo "🗑️  Suppression du répertoire temporaire..."
+                    if rm -rf "$SOURCE_DIR"; then
+                        echo "✅ Répertoire temporaire supprimé"
+                    else
+                        echo "⚠️  Erreur lors de la suppression"
+                    fi
+                fi
+                ;;
+        esac
     fi
 fi
 
 echo ""
 echo "📖 Consultez le README.md pour plus d'informations et la documentation complète"
-
-# Fonction pour ajouter la fonction arr-monitor au bashrc
-setup_bashrc_function() {
-    local bashrc_file="$HOME/.bashrc"
-    local function_name="arr-monitor"
-    local script_path="$(pwd)"
-    
-    echo "🔧 Configuration de la fonction bashrc '$function_name'..."
-    
-    # Vérifier si la fonction existe déjà
-    if grep -q "function $function_name" "$bashrc_file" 2>/dev/null; then
-        echo "📝 Mise à jour de la fonction existante dans $bashrc_file"
-        
-        # Supprimer l'ancienne fonction
-        sed -i '/^# Arr Monitor function$/,/^}$/d' "$bashrc_file" 2>/dev/null || true
-    else
-        echo "📝 Ajout de la nouvelle fonction dans $bashrc_file"
-    fi
-    
-    # Ajouter la nouvelle fonction
-    cat >> "$bashrc_file" << EOF
-
-# Arr Monitor function
-function $function_name() {
-    local current_dir="\$(pwd)"
-    cd "$script_path"
-    
-    case "\${1:-menu}" in
-        "start"|"run")
-            echo "🚀 Démarrage Arr Monitor..."
-            ./arr-launcher.sh
-            ;;
-        "test")
-            echo "🧪 Test Arr Monitor..."
-            source venv/bin/activate
-            python3 arr-monitor.py --test --debug
-            ;;
-        "status")
-            echo "📊 État du système..."
-            ./arr-launcher.sh
-            # Force le menu à afficher le status
-            ;;
-        "config")
-            echo "⚙️ Configuration Arr Monitor..."
-            if command -v nano &> /dev/null; then
-                nano config/config.yaml
-            elif command -v vim &> /dev/null; then
-                vim config/config.yaml
-            else
-                echo "Éditez manuellement: $script_path/config/config.yaml"
-            fi
-            ;;
-        "logs")
-            echo "📋 Logs Arr Monitor..."
-            if [[ -f "$script_path/logs/arr-monitor.log" ]]; then
-                tail -f "$script_path/logs/arr-monitor.log"
-            else
-                echo "❌ Aucun fichier de log trouvé"
-            fi
-            ;;
-        "update")
-            echo "🔍 Vérification des mises à jour..."
-            source venv/bin/activate
-            python3 update_checker.py
-            ;;
-        "menu")
-            echo "🎯 Menu Arr Monitor..."
-            ./arr-launcher.sh
-            ;;
-        "help"|"--help"|"-h")
-            echo ""
-            echo "🚀 Arr Monitor - Commandes disponibles:"
-            echo ""
-            echo "  $function_name [commande]"
-            echo ""
-            echo "Commandes:"
-            echo "  start, run    - Démarrer le monitoring (menu interactif)"
-            echo "  test          - Exécuter un test unique"
-            echo "  status        - Afficher l'état du système"
-            echo "  config        - Éditer la configuration"
-            echo "  logs          - Voir les logs en temps réel"
-            echo "  update        - Vérifier les mises à jour"
-            echo "  menu          - Afficher le menu principal (défaut)"
-            echo "  help          - Afficher cette aide"
-            echo ""
-            echo "Exemples:"
-            echo "  $function_name              # Menu principal"
-            echo "  $function_name start        # Démarrage monitoring"
-            echo "  $function_name test         # Test debug"
-            echo "  $function_name logs         # Logs temps réel"
-            echo ""
-            ;;
-        *)
-            echo "❌ Commande inconnue: \$1"
-            echo "💡 Utilisez '$function_name help' pour voir les commandes disponibles"
-            ;;
-    esac
-    
-    cd "\$current_dir"
-}
-
-# Alias pour compatibilité
-alias arrmonitor='$function_name'
-alias arr='$function_name'
-EOF
-
-    echo "✅ Fonction '$function_name' ajoutée au bashrc"
-    echo "💡 Utilisez les commandes suivantes après 'source ~/.bashrc' :"
-    echo "   • $function_name          # Menu principal"
-    echo "   • $function_name start    # Démarrage monitoring"
-    echo "   • $function_name test     # Test debug"
-    echo "   • $function_name logs     # Logs temps réel"
-    echo "   • $function_name help     # Aide complète"
-    echo ""
-    echo "🔗 Alias disponibles : 'arrmonitor' et 'arr'"
-}

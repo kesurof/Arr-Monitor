@@ -1,6 +1,6 @@
-# 🚀 Arr Monitor v1.1.0 - Surveillance Sonarr/Radarr � Arr Monitor v1.0.0 - Surveillance Sonarr/Radarr
+# 🚀 Arr Monitor v1.1.2 - Surveillance Sonarr/Radarr
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/kesurof/Arr-Monitor)
+[![Version](https://img.shields.io/badge/version-1.1.2-blue.svg)](https://github.com/kesurof/Arr-Monitor)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![ARM64](https://img.shields.io/badge/ARM64-optimized-green.svg)](https://arm.com)
@@ -8,6 +8,13 @@
 ## 📝 Description
 
 **Arr Monitor** est un outil de surveillance et de gestion automatique optimisé pour les serveurs ARM64. Il surveille Sonarr et Radarr, détecte les erreurs qBittorrent spécifiques, et applique l'action "Blocklist and Search" pour une résolution intelligente.
+
+### 🎯 **Nouveautés v1.1.2**
+- 🔧 **Bashrc simplifié** : Un seul raccourci `arr-monitor` pour accéder au menu
+- 🧹 **Nettoyage automatique** intelligent du répertoire source après installation
+- 📁 **Copie complète** de tous les fichiers nécessaires (arr-launcher.sh, update_checker.py, .version)
+- 🛡️ **Sécurité renforcée** pour le nettoyage automatique avec vérifications multiples
+- 🎯 **Installation simplifiée** avec détection automatique des répertoires temporaires
 
 ### 🎯 **Nouveautés v1.1.0**
 - 🔬 **Mode diagnostic complet** pour analyser les queues en détail
