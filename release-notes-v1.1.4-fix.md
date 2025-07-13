@@ -1,41 +1,101 @@
-# 🔧 Arr Monitor v1.1.4 - Correction Critique
+# 🔧 Arr Monitor v1.1.4 - Version Centralisée et Détection Stricte
 
-## ⚠️ Correction Importante
-Cette version corrige un oubli dans la version précédente où le numéro de version n'était pas correctement mis à jour dans le code.
+## 🎯 VERSION FINALE COMPLÈTE
 
-## 🔧 Corrections
-- **Fix version** : Correction du numéro de version affiché (1.1.0 → 1.1.4)
-  - Ligne 5 : Commentaire de documentation
-  - Ligne 26 : Variable `self.version` dans la classe
-- **Cohérence** : Toutes les références de version sont maintenant synchronisées
+Cette version apporte la **centralisation complète** du système de version et corrige définitivement tous les problèmes de synchronisation.
 
-## 🎯 Rappel des Fonctionnalités v1.1.4
+## 🔧 SYSTÈME DE VERSION CENTRALISÉ (NOUVEAU!)
 
-### Détection Stricte (CRITIQUE)
-- ✅ **Protection renforcée** : Le script ne supprime QUE les erreurs `qBittorrent is reporting an error`
-- ✅ **Sécurité** : Les téléchargements `stalled with no connections` sont préservés
-- ✅ **Précision** : Évite les suppressions accidentelles de téléchargements légitimes
+### ✨ Innovation Majeure
+- **Fichier unique** : `.version` contient la version (1.1.4)
+- **Lecture automatique** : Tous les scripts lisent depuis ce fichier
+- **Cohérence garantie** : Plus jamais de versions incohérentes
+- **Maintenance simplifiée** : Une seule modification met à jour tout
 
-### Nouvelles Fonctionnalités
-- 🔄 **Auto-refresh** : Menu pour réactualiser l'IP et l'API key automatiquement
-- 🐛 **Gestion d'erreurs** : Amélioration du message d'erreur 404 dans update_checker
-- 📚 **Documentation** : README simplifié (758 → ~200 lignes)
+### 🛠️ Corrections Techniques
+- **Launcher** : Lit dynamiquement depuis `.version` 
+- **Monitor** : Utilise `_read_version_file()` automatique
+- **Update Checker** : Détection automatique de la version courante
+- **Fallback** : Version par défaut 1.1.4 si fichier absent
 
-## 📥 Installation
+## 🛡️ DÉTECTION STRICTE (CRITIQUE)
+
+### Protection Renforcée
+- ✅ **Suppression UNIQUE** : `qBittorrent is reporting an error` seulement
+- ✅ **Protection** : `stalled with no connections` préservés
+- ✅ **Sécurité** : Aucune suppression accidentelle possible
+- ✅ **Précision** : Détection ciblée et stricte
+
+## 🆕 Fonctionnalités Complètes
+
+### Auto-Refresh Configuration
+- 🔄 **Detection Docker** : Conteneurs Sonarr/Radarr automatique
+- 🔑 **Extraction API** : Clés API trouvées automatiquement  
+- � **URLs dynamiques** : IPs mises à jour en temps réel
+- 🧪 **Test connexion** : Validation immédiate
+
+### Améliorations Interface
+- 🐛 **Erreurs 404** : Messages explicites et clairs
+- 📚 **Documentation** : README simplifié (~200 lignes)
+- 🎯 **Bashrc Integration** : Commandes globales disponibles
+- 🔧 **Logs anonymisés** : Protection des données sensibles
+
+## 📥 Installation/Mise à jour
+
 ```bash
-# Mise à jour automatique via le menu
+# Méthode 1: Via le menu (recommandé)
 ./arr-launcher.sh
+# Choix 7 pour vérifier les mises à jour
 
-# Ou mise à jour manuelle
+# Méthode 2: Git direct
 git pull origin main
+
+# Méthode 3: Update automatique
+cd /path/to/Arr-Monitor && git fetch && git reset --hard origin/main
 ```
 
-## ⚠️ Important
-Cette version est essentielle pour tous les utilisateurs car elle contient la correction critique de détection stricte qui protège vos téléchargements contre les suppressions accidentelles.
+## ✅ Validation Complète
+
+### Tests de Cohérence
+- **Version Launcher** : `v1.1.4` ✅
+- **Version Monitor** : `1.1.4` depuis `.version` ✅  
+- **Update Checker** : Pas de fausse détection ✅
+- **Configuration** : Auto-refresh fonctionnel ✅
+
+### Tests de Sécurité
+- **Détection Stricte** : Erreurs qBittorrent uniquement ✅
+- **Protection Downloads** : Stalled préservés ✅
+- **API Safety** : Clés anonymisées dans logs ✅
+
+## 🎯 Impact Utilisateur
+
+### Avant (v1.1.3 et antérieures)
+- ❌ Versions incohérentes entre composants
+- ❌ Fausses détections de mise à jour
+- ❌ Suppression trop large d'erreurs
+- ❌ Configuration manuelle complexe
+
+### Après (v1.1.4)
+- ✅ Version unique et cohérente partout
+- ✅ Détection de mise à jour précise
+- ✅ Suppression ciblée et sécurisée  
+- ✅ Configuration auto-refresh disponible
+
+## ⚠️ RECOMMANDATION CRITIQUE
+
+**Déployez immédiatement cette version** pour :
+1. **Protéger vos téléchargements** contre les suppressions accidentelles
+2. **Éliminer les incohérences** de version
+3. **Bénéficier de l'auto-refresh** de configuration
+4. **Profiter d'une maintenance simplifiée**
 
 ## 🔗 Fichiers Modifiés
-- `arr-monitor.py` : Correction du numéro de version
-- Tous les autres fichiers restent identiques à v1.1.4
+
+- `.version` : Fichier central de version (NOUVEAU)
+- `arr-launcher.sh` : Lecture dynamique de version
+- `arr-monitor.py` : Méthode `_read_version_file()` 
+- `update_checker.py` : Auto-détection version
+- `release-notes-v1.1.4-fix.md` : Documentation complète
 
 ---
-**Version complète et corrigée** - Déployez immédiatement pour bénéficier de la protection optimale de vos téléchargements.
+**🚀 VERSION PRODUCTION READY** - Système complet, sécurisé et maintenable
