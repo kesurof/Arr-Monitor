@@ -3,11 +3,11 @@
 
 applications:
   sonarr:
-    enabled: true
+    enabled: false
     url: "http://localhost:8989"
     api_key: "your_sonarr_api_key"
   radarr:
-    enabled: true
+    enabled: false
     url: "http://localhost:7878"
     api_key: "your_radarr_api_key"
 

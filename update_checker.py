@@ -23,14 +23,22 @@ class UpdateChecker:
             response = requests.get(self.api_url, timeout=10)
             response.raise_for_status()
             return response.json()
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                self.logger.info("ℹ️  Aucune release disponible sur GitHub pour le moment")
+                return None
+            else:
+                self.logger.error(f"❌ Erreur HTTP lors de la vérification des mises à jour : {e}")
+                return None
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"❌ Erreur lors de la vérification des mises à jour : {e}")
+            self.logger.error(f"❌ Erreur réseau lors de la vérification des mises à jour : {e}")
             return None
     
     def check_for_updates(self):
         """Vérifie s'il y a une nouvelle version disponible"""
         latest_release = self.get_latest_release()
         if not latest_release:
+            # Pas d'erreur, juste pas de release disponible
             return None, None, None
             
         latest_version = latest_release.get('tag_name', '').lstrip('v')
@@ -76,7 +84,7 @@ def main():
         print(f"📋 Notes de version :\n{notes}")
         print(f"🔗 Télécharger : {url}")
     else:
-        print("✅ Vous avez la dernière version")
+        print("✅ Vous avez la dernière version (ou aucune release GitHub disponible)")
 
 if __name__ == "__main__":
     main()

@@ -475,7 +475,7 @@ if [ "$CONFIG_CREATED" = true ]; then
     echo "📍 Configuration modifiée dans : $(pwd)/config/config.yaml.local"
     
     if [[ $ENABLE_SONARR =~ ^[Yy]$ ]]; then
-        sed -i.bak1 "s|enabled: false|enabled: true|" config/config.yaml.local
+        sed -i.bak1 "/sonarr:/,/radarr:/ s|enabled: false|enabled: true|" config/config.yaml.local
         sed -i.bak2 "s|url: \"http://localhost:8989\"|url: \"$SONARR_URL\"|" config/config.yaml.local
         sed -i.bak3 "s|api_key: \"your_sonarr_api_key\"|api_key: \"$SONARR_API\"|" config/config.yaml.local
     else

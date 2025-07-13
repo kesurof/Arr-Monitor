@@ -134,7 +134,7 @@ check_updates() {
     
     if [[ -f "$SCRIPT_DIR/update_checker.py" ]]; then
         source "$VENV_DIR/bin/activate"
-        python3 "$SCRIPT_DIR/update_checker.py"
+        python3 "$SCRIPT_DIR/update_checker.py" 2>/dev/null || info "ℹ️  Vérification des mises à jour non disponible (aucune release GitHub publiée)"
     else
         warn "Module de vérification des mises à jour non trouvé"
     fi
@@ -246,7 +246,12 @@ function $function_name() {
         "update")
             echo "🔍 Vérification des mises à jour..."
             source venv/bin/activate
-            python3 update_checker.py
+            python3 update_checker.py 2>/dev/null || echo "ℹ️  Vérification des mises à jour non disponible (aucune release GitHub)"
+            ;;
+        "refresh"|"refresh-config")
+            echo "🔄 Réactualisation de la configuration..."
+            ./arr-launcher.sh
+            # Note: La fonction refresh_config sera appelée via le menu interactif
             ;;
         "menu")
             echo "🎯 Menu Arr Monitor..."
@@ -263,6 +268,7 @@ function $function_name() {
             echo "  test          - Exécuter un test unique"
             echo "  diagnose      - Diagnostic complet de la queue"
             echo "  config        - Éditer la configuration"
+            echo "  refresh       - Réactualiser IPs et clés API automatiquement"
             echo "  logs          - Voir les logs en temps réel"
             echo "  update        - Vérifier les mises à jour"
             echo "  menu          - Afficher le menu principal (défaut)"
@@ -291,6 +297,254 @@ EOF
     fi
 }
 
+# Réactualisation automatique des IPs et clés API
+refresh_config() {
+    info "🔄 Réactualisation automatique de la configuration..."
+    
+    if [[ ! -f "$CONFIG_DIR/config.yaml" ]]; then
+        error "Fichier de configuration non trouvé : $CONFIG_DIR/config.yaml"
+        return 1
+    fi
+    
+    # Sauvegarde de la configuration actuelle
+    local backup_file="$CONFIG_DIR/config.yaml.backup.$(date +%Y%m%d_%H%M%S)"
+    cp "$CONFIG_DIR/config.yaml" "$backup_file"
+    info "💾 Sauvegarde créée : $(basename "$backup_file")"
+    
+    # Variables pour la détection
+    local SONARR_DETECTED=""
+    local RADARR_DETECTED=""
+    local SONARR_API_DETECTED=""
+    local RADARR_API_DETECTED=""
+    
+    # Fonction de détection des conteneurs (adaptée du script d'installation)
+    detect_containers_refresh() {
+        echo "🔍 Détection automatique des conteneurs..."
+        
+        if command -v docker &> /dev/null; then
+            # Détecter Sonarr
+            if docker ps --format "table {{.Names}}" | grep -q "sonarr"; then
+                local SONARR_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "sonarr" | head -1)
+                
+                # Méthode 1: Essayer réseau traefik_proxy
+                local SONARR_IP=$(docker inspect $SONARR_CONTAINER --format='{{.NetworkSettings.Networks.traefik_proxy.IPAddress}}' 2>/dev/null | grep -v '^$' | head -1)
+                
+                # Méthode 2: Si pas de traefik_proxy, prendre la première IP disponible
+                if [ -z "$SONARR_IP" ]; then
+                    SONARR_IP=$(docker inspect $SONARR_CONTAINER --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null | head -1)
+                fi
+                
+                # Méthode 3: Si toujours pas d'IP, utiliser le port mapping
+                if [ -z "$SONARR_IP" ]; then
+                    local SONARR_PORT=$(docker port $SONARR_CONTAINER 8989/tcp 2>/dev/null | cut -d: -f2)
+                    if [ -n "$SONARR_PORT" ]; then
+                        SONARR_DETECTED="http://localhost:$SONARR_PORT"
+                        echo "  ✅ Sonarr détecté via port mapping: $SONARR_CONTAINER -> $SONARR_DETECTED"
+                    fi
+                else
+                    SONARR_DETECTED="http://$SONARR_IP:8989"
+                    echo "  ✅ Sonarr détecté via IP container: $SONARR_CONTAINER -> $SONARR_DETECTED"
+                fi
+            fi
+            
+            # Détecter Radarr (même logique)
+            if docker ps --format "table {{.Names}}" | grep -q "radarr"; then
+                local RADARR_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "radarr" | head -1)
+                
+                # Méthode 1: Essayer réseau traefik_proxy
+                local RADARR_IP=$(docker inspect $RADARR_CONTAINER --format='{{.NetworkSettings.Networks.traefik_proxy.IPAddress}}' 2>/dev/null | grep -v '^$' | head -1)
+                
+                # Méthode 2: Si pas de traefik_proxy, prendre la première IP disponible
+                if [ -z "$RADARR_IP" ]; then
+                    RADARR_IP=$(docker inspect $RADARR_CONTAINER --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null | head -1)
+                fi
+                
+                # Méthode 3: Si toujours pas d'IP, utiliser le port mapping
+                if [ -z "$RADARR_IP" ]; then
+                    local RADARR_PORT=$(docker port $RADARR_CONTAINER 7878/tcp 2>/dev/null | cut -d: -f2)
+                    if [ -n "$RADARR_PORT" ]; then
+                        RADARR_DETECTED="http://localhost:$RADARR_PORT"
+                        echo "  ✅ Radarr détecté via port mapping: $RADARR_CONTAINER -> $RADARR_DETECTED"
+                    fi
+                else
+                    RADARR_DETECTED="http://$RADARR_IP:7878"
+                    echo "  ✅ Radarr détecté via IP container: $RADARR_CONTAINER -> $RADARR_DETECTED"
+                fi
+            fi
+            
+            if [ -z "$SONARR_DETECTED" ] && [ -z "$RADARR_DETECTED" ]; then
+                echo "  ⚠️  Aucun conteneur Sonarr/Radarr détecté"
+            fi
+        else
+            echo "  ⚠️  Docker non disponible"
+        fi
+    }
+    
+    # Fonction de détection des clés API (adaptée du script d'installation)
+    detect_api_keys_refresh() {
+        echo "🔑 Recherche des clés API..."
+        
+        # Fonction pour extraire la clé API depuis un fichier config.xml
+        extract_api_key() {
+            local config_file="$1"
+            if [ -f "$config_file" ]; then
+                grep -o '<ApiKey>[^<]*</ApiKey>' "$config_file" 2>/dev/null | sed 's/<ApiKey>\(.*\)<\/ApiKey>/\1/' | head -1
+            fi
+        }
+        
+        # Chercher les clés API Sonarr
+        # Méthode 1: Via SETTINGS_STORAGE (structure seedbox)
+        if [ -n "$SETTINGS_STORAGE" ] && [ -f "$SETTINGS_STORAGE/docker/$USER/sonarr/config/config.xml" ]; then
+            SONARR_API_DETECTED=$(extract_api_key "$SETTINGS_STORAGE/docker/$USER/sonarr/config/config.xml")
+            [ -n "$SONARR_API_DETECTED" ] && echo "  🔑 Clé API Sonarr trouvée via SETTINGS_STORAGE: ${SONARR_API_DETECTED:0:8}..."
+        fi
+        
+        # Méthode 2: Via conteneur Docker
+        if [ -z "$SONARR_API_DETECTED" ] && command -v docker &> /dev/null && docker ps --format "table {{.Names}}" | grep -q "sonarr"; then
+            local SONARR_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "sonarr" | head -1)
+            SONARR_API_DETECTED=$(docker exec "$SONARR_CONTAINER" cat /config/config.xml 2>/dev/null | grep -o '<ApiKey>[^<]*</ApiKey>' | sed 's/<ApiKey>\(.*\)<\/ApiKey>/\1/' | head -1)
+            [ -n "$SONARR_API_DETECTED" ] && echo "  🔑 Clé API Sonarr trouvée via conteneur: ${SONARR_API_DETECTED:0:8}..."
+        fi
+        
+        # Méthode 3: Fichiers locaux standards
+        if [ -z "$SONARR_API_DETECTED" ] && [ -f "/home/$USER/.config/Sonarr/config.xml" ]; then
+            SONARR_API_DETECTED=$(extract_api_key "/home/$USER/.config/Sonarr/config.xml")
+            [ -n "$SONARR_API_DETECTED" ] && echo "  🔑 Clé API Sonarr trouvée dans ~/.config: ${SONARR_API_DETECTED:0:8}..."
+        fi
+        
+        # Chercher les clés API Radarr (même logique)
+        # Méthode 1: Via SETTINGS_STORAGE
+        if [ -n "$SETTINGS_STORAGE" ] && [ -f "$SETTINGS_STORAGE/docker/$USER/radarr/config/config.xml" ]; then
+            RADARR_API_DETECTED=$(extract_api_key "$SETTINGS_STORAGE/docker/$USER/radarr/config/config.xml")
+            [ -n "$RADARR_API_DETECTED" ] && echo "  🔑 Clé API Radarr trouvée via SETTINGS_STORAGE: ${RADARR_API_DETECTED:0:8}..."
+        fi
+        
+        # Méthode 2: Via conteneur Docker
+        if [ -z "$RADARR_API_DETECTED" ] && command -v docker &> /dev/null && docker ps --format "table {{.Names}}" | grep -q "radarr"; then
+            local RADARR_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "radarr" | head -1)
+            RADARR_API_DETECTED=$(docker exec "$RADARR_CONTAINER" cat /config/config.xml 2>/dev/null | grep -o '<ApiKey>[^<]*</ApiKey>' | sed 's/<ApiKey>\(.*\)<\/ApiKey>/\1/' | head -1)
+            [ -n "$RADARR_API_DETECTED" ] && echo "  🔑 Clé API Radarr trouvée via conteneur: ${RADARR_API_DETECTED:0:8}..."
+        fi
+        
+        # Méthode 3: Fichiers locaux standards
+        if [ -z "$RADARR_API_DETECTED" ] && [ -f "/home/$USER/.config/Radarr/config.xml" ]; then
+            RADARR_API_DETECTED=$(extract_api_key "/home/$USER/.config/Radarr/config.xml")
+            [ -n "$RADARR_API_DETECTED" ] && echo "  🔑 Clé API Radarr trouvée dans ~/.config: ${RADARR_API_DETECTED:0:8}..."
+        fi
+    }
+    
+    # Lancer les détections
+    detect_containers_refresh
+    detect_api_keys_refresh
+    
+    echo ""
+    
+    # Mise à jour de la configuration
+    local changes_made=false
+    
+    # Mise à jour Sonarr
+    if [ -n "$SONARR_DETECTED" ] && [ -n "$SONARR_API_DETECTED" ]; then
+        echo "📺 Mise à jour de la configuration Sonarr..."
+        
+        # Activer Sonarr s'il était désactivé
+        sed -i.tmp1 "/sonarr:/,/radarr:/ s|enabled: false|enabled: true|" "$CONFIG_DIR/config.yaml"
+        
+        # Mettre à jour l'URL
+        sed -i.tmp2 "s|url: \"http://.*:8989\"|url: \"$SONARR_DETECTED\"|" "$CONFIG_DIR/config.yaml"
+        
+        # Mettre à jour la clé API
+        if grep -q "your_sonarr_api_key" "$CONFIG_DIR/config.yaml"; then
+            sed -i.tmp3 "s|api_key: \"your_sonarr_api_key\"|api_key: \"$SONARR_API_DETECTED\"|" "$CONFIG_DIR/config.yaml"
+        else
+            # Remplacer l'ancienne clé API
+            sed -i.tmp3 "/sonarr:/,/radarr:/ s|api_key: \".*\"|api_key: \"$SONARR_API_DETECTED\"|" "$CONFIG_DIR/config.yaml"
+        fi
+        
+        echo "  ✅ Sonarr configuré : $SONARR_DETECTED"
+        changes_made=true
+    else
+        echo "📺 Sonarr : Aucune configuration automatique possible"
+        if [ -z "$SONARR_DETECTED" ]; then
+            echo "  ⚠️  URL non détectée"
+        fi
+        if [ -z "$SONARR_API_DETECTED" ]; then
+            echo "  ⚠️  Clé API non détectée"
+        fi
+    fi
+    
+    # Mise à jour Radarr
+    if [ -n "$RADARR_DETECTED" ] && [ -n "$RADARR_API_DETECTED" ]; then
+        echo "🎬 Mise à jour de la configuration Radarr..."
+        
+        # Activer Radarr s'il était désactivé
+        sed -i.tmp4 "/radarr:/,/monitoring:/ s|enabled: false|enabled: true|" "$CONFIG_DIR/config.yaml"
+        
+        # Mettre à jour l'URL
+        sed -i.tmp5 "s|url: \"http://.*:7878\"|url: \"$RADARR_DETECTED\"|" "$CONFIG_DIR/config.yaml"
+        
+        # Mettre à jour la clé API
+        if grep -q "your_radarr_api_key" "$CONFIG_DIR/config.yaml"; then
+            sed -i.tmp6 "s|api_key: \"your_radarr_api_key\"|api_key: \"$RADARR_API_DETECTED\"|" "$CONFIG_DIR/config.yaml"
+        else
+            # Remplacer l'ancienne clé API
+            sed -i.tmp6 "/radarr:/,/monitoring:/ s|api_key: \".*\"|api_key: \"$RADARR_API_DETECTED\"|" "$CONFIG_DIR/config.yaml"
+        fi
+        
+        echo "  ✅ Radarr configuré : $RADARR_DETECTED"
+        changes_made=true
+    else
+        echo "🎬 Radarr : Aucune configuration automatique possible"
+        if [ -z "$RADARR_DETECTED" ]; then
+            echo "  ⚠️  URL non détectée"
+        fi
+        if [ -z "$RADARR_API_DETECTED" ]; then
+            echo "  ⚠️  Clé API non détectée"
+        fi
+    fi
+    
+    # Nettoyer les fichiers temporaires
+    rm -f "$CONFIG_DIR/config.yaml.tmp"*
+    
+    echo ""
+    if [ "$changes_made" = true ]; then
+        info "✅ Configuration mise à jour avec succès !"
+        echo "📁 Fichier modifié : $CONFIG_DIR/config.yaml"
+        echo "💾 Sauvegarde disponible : $backup_file"
+        
+        # Test de connexion optionnel
+        echo ""
+        read -p "🧪 Voulez-vous tester la connexion maintenant ? [Y/n] : " test_connection
+        test_connection=${test_connection:-Y}
+        
+        if [[ $test_connection =~ ^[Yy]$ ]]; then
+            echo ""
+            echo "🔍 Test de connexion..."
+            
+            if [ -n "$SONARR_DETECTED" ] && [ -n "$SONARR_API_DETECTED" ]; then
+                if curl -s -f -H "X-Api-Key: $SONARR_API_DETECTED" "$SONARR_DETECTED/api/v3/system/status" >/dev/null 2>&1; then
+                    echo "  ✅ Connexion Sonarr réussie"
+                else
+                    echo "  ❌ Connexion Sonarr échouée"
+                fi
+            fi
+            
+            if [ -n "$RADARR_DETECTED" ] && [ -n "$RADARR_API_DETECTED" ]; then
+                if curl -s -f -H "X-Api-Key: $RADARR_API_DETECTED" "$RADARR_DETECTED/api/v3/system/status" >/dev/null 2>&1; then
+                    echo "  ✅ Connexion Radarr réussie"
+                else
+                    echo "  ❌ Connexion Radarr échouée"
+                fi
+            fi
+        fi
+    else
+        warn "Aucune modification automatique possible."
+        echo "💡 Vérifiez manuellement :"
+        echo "   • Les conteneurs Docker sont-ils en cours d'exécution ?"
+        echo "   • Les fichiers de configuration sont-ils accessibles ?"
+        echo "   • Les variables d'environnement seedbox sont-elles définies ?"
+    fi
+}
+
 # Menu principal
 show_menu() {
     clear
@@ -305,15 +559,16 @@ show_menu() {
     echo -e "${BLUE}2)${NC} 🧪 Test unique (mode debug)"
     echo -e "${BLUE}3)${NC} 🔬 Diagnostic complet de la queue"
     echo -e "${BLUE}4)${NC} ⚙️  Configuration"
-    echo -e "${BLUE}5)${NC} 📊 État du système"
-    echo -e "${BLUE}6)${NC} 🔍 Vérifier les mises à jour"
-    echo -e "${BLUE}7)${NC} 🧹 Nettoyer les logs"
-    echo -e "${BLUE}8)${NC} 📋 Voir les logs en temps réel"
-    echo -e "${BLUE}9)${NC} 🛠️  Installation/Configuration systemd"
+    echo -e "${BLUE}5)${NC} � Réactualiser IPs et clés API automatiquement"
+    echo -e "${BLUE}6)${NC} �📊 État du système"
+    echo -e "${BLUE}7)${NC} 🔍 Vérifier les mises à jour"
+    echo -e "${BLUE}8)${NC} 🧹 Nettoyer les logs"
+    echo -e "${BLUE}9)${NC} 📋 Voir les logs en temps réel"
+    echo -e "${BLUE}S)${NC} 🛠️  Installation/Configuration systemd"
     echo -e "${BLUE}A)${NC} 🎯 Configurer les commandes bashrc"
     echo -e "${BLUE}0)${NC} ❌ Quitter"
     echo ""
-    echo -ne "${GREEN}Votre choix [0-9,A]:${NC} "
+    echo -ne "${GREEN}Votre choix [0-9,S,A]:${NC} "
 }
 
 # Lancement du monitoring
@@ -452,20 +707,24 @@ main() {
                 configure_app
                 ;;
             5)
-                show_system_status
+                refresh_config
+                read -p "Appuyez sur Entrée pour continuer..."
                 ;;
             6)
+                show_system_status
+                ;;
+            7)
                 check_updates
                 read -p "Appuyez sur Entrée pour continuer..."
                 ;;
-            7)
+            8)
                 cleanup_logs
                 read -p "Appuyez sur Entrée pour continuer..."
                 ;;
-            8)
+            9)
                 show_live_logs
                 ;;
-            9)
+            S|s)
                 install_systemd
                 ;;
             A|a)
@@ -477,7 +736,7 @@ main() {
                 exit 0
                 ;;
             *)
-                error "Choix invalide. Veuillez sélectionner 0-9 ou A."
+                error "Choix invalide. Veuillez sélectionner 0-9, S ou A."
                 sleep 2
                 ;;
         esac
