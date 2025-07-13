@@ -296,33 +296,19 @@ class ArrMonitor:
             return False
     
     def is_download_failed(self, item):
-        """Vérifie si un téléchargement a une erreur (détection élargie)"""
-        status = item.get('status', '').lower()
+        """Vérifie si un téléchargement a l'erreur qBittorrent spécifique UNIQUEMENT"""
         error_message = item.get('errorMessage', '')
-        tracked_status = item.get('trackedDownloadStatus', '').lower()
-        tracked_state = item.get('trackedDownloadState', '').lower()
         
-        # Détection élargie basée sur vos scripts
-        is_error = (
-            # Erreur qBittorrent spécifique (votre cas principal)
-            (error_message and "qBittorrent is reporting an error" in error_message) or
-            
-            # Autres statuts d'erreur
-            status in ['failed', 'warning', 'error', 'stalled', 'paused'] or
-            
-            # Messages d'erreur généraux
-            bool(error_message) or
-            
-            # Statuts de tracking problématiques
-            tracked_status == 'warning' or
-            tracked_state == 'importfailed'
+        # DÉTECTION STRICTE : Seulement l'erreur qBittorrent spécifique
+        is_qbittorrent_error = (
+            error_message and "qBittorrent is reporting an error" in error_message
         )
         
-        if is_error:
-            # Log détaillé pour debug
-            self.logger.debug(f"🔍 Erreur détectée - Status: {status}, Error: {error_message}, Tracked: {tracked_status}/{tracked_state}")
+        if is_qbittorrent_error:
+            # Log pour confirmer la détection
+            self.logger.debug(f"🎯 Erreur qBittorrent détectée - Error: {error_message}")
         
-        return is_error
+        return is_qbittorrent_error
     
     def process_application(self, app_name, app_config):
         """Traite une application (Sonarr ou Radarr)"""

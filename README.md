@@ -12,10 +12,11 @@
 ## ✨ Fonctionnalités
 
 ### 🔍 **Surveillance Intelligente**
-- 🎯 **Détection spécifique** : "qBittorrent is reporting an error"
+- 🎯 **Détection spécifique** : UNIQUEMENT "qBittorrent is reporting an error"
 - 🚫 **Action intelligente** : Blocklist + Search automatique  
 - 📊 **Surveillance continue** avec intervalle de 5 minutes
 - 🔧 **Optimisé ARM64** pour votre serveur
+- ⚠️ **Important** : Ne touche PAS aux autres erreurs (stalled, warnings, etc.)
 
 ### ⚡ **Actions Automatiques**
 - 🚫 **Blocklist automatique** des releases défaillantes
