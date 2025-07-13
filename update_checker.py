@@ -11,11 +11,25 @@ import sys
 from pathlib import Path
 
 class UpdateChecker:
-    def __init__(self, repo="kesurof/Arr-Monitor", current_version="1.0.0"):
+    def __init__(self, repo="kesurof/Arr-Monitor", current_version=None):
         self.repo = repo
+        # Lire la version depuis le fichier .version si pas fournie
+        if current_version is None:
+            current_version = self._read_version_file()
         self.current_version = current_version
         self.api_url = f"https://api.github.com/repos/{repo}/releases/latest"
         self.logger = logging.getLogger(__name__)
+    
+    def _read_version_file(self):
+        """Lit la version depuis le fichier .version"""
+        try:
+            version_file = Path(__file__).parent / '.version'
+            if version_file.exists():
+                version = version_file.read_text().strip()
+                return version
+        except Exception:
+            pass
+        return "1.1.4"  # Fallback
         
     def get_latest_release(self):
         """Récupère les informations de la dernière release GitHub"""

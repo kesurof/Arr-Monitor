@@ -10,7 +10,13 @@ CONFIG_DIR="$SCRIPT_DIR/config"
 LOG_DIR="$SCRIPT_DIR/logs"
 VENV_DIR="$SCRIPT_DIR/venv"
 VERSION_FILE="$SCRIPT_DIR/.version"
-CURRENT_VERSION="1.1.0"
+
+# Lire la version depuis le fichier .version
+if [ -f "$VERSION_FILE" ]; then
+    CURRENT_VERSION=$(cat "$VERSION_FILE" | tr -d '\n\r' | sed 's/[[:space:]]*$//')
+else
+    CURRENT_VERSION="1.1.4"  # Fallback
+fi
 
 # Couleurs pour l'affichage
 RED='\033[0;31m'
