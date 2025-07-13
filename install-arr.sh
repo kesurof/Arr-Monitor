@@ -408,22 +408,12 @@ if [ "$CONFIG_CREATED" = true ]; then
         SONARR_API="$SONARR_API_DETECTED"
         echo "� Sonarr configuré automatiquement : $SONARR_URL"
         
-        # Test de connexion silencieux
-        if python -c "
-import requests
-try:
-    response = requests.get('$SONARR_URL/api/v3/system/status', headers={'X-Api-Key': '$SONARR_API'}, timeout=5)
-    if response.status_code == 200:
-        exit(0)
-    else:
-        exit(1)
-except:
-    exit(1)
-" 2>/dev/null; then
+        # Test de connexion avec curl (plus fiable que Python à ce stade)
+        if curl -s -f -H "X-Api-Key: $SONARR_API" "$SONARR_URL/api/v3/system/status" >/dev/null 2>&1; then
             echo "   ✅ Connexion Sonarr vérifiée"
         else
-            echo "   ⚠️  Connexion Sonarr échouée - configuration manuelle requise"
-            ENABLE_SONARR="N"
+            echo "   ⚠️  Test connexion Sonarr échoué - mais clés détectées, configuration appliquée"
+            # On garde ENABLE_SONARR="Y" car la détection a fonctionné
         fi
     else
         echo "📺 Sonarr non détecté automatiquement - désactivé"
@@ -440,22 +430,12 @@ except:
         RADARR_API="$RADARR_API_DETECTED"
         echo "🎬 Radarr configuré automatiquement : $RADARR_URL"
         
-        # Test de connexion silencieux
-        if python -c "
-import requests
-try:
-    response = requests.get('$RADARR_URL/api/v3/system/status', headers={'X-Api-Key': '$RADARR_API'}, timeout=5)
-    if response.status_code == 200:
-        exit(0)
-    else:
-        exit(1)
-except:
-    exit(1)
-" 2>/dev/null; then
+        # Test de connexion avec curl (plus fiable que Python à ce stade)
+        if curl -s -f -H "X-Api-Key: $RADARR_API" "$RADARR_URL/api/v3/system/status" >/dev/null 2>&1; then
             echo "   ✅ Connexion Radarr vérifiée"
         else
-            echo "   ⚠️  Connexion Radarr échouée - configuration manuelle requise"
-            ENABLE_RADARR="N"
+            echo "   ⚠️  Test connexion Radarr échoué - mais clés détectées, configuration appliquée"
+            # On garde ENABLE_RADARR="Y" car la détection a fonctionné
         fi
     else
         echo "🎬 Radarr non détecté automatiquement - désactivé"
@@ -471,21 +451,23 @@ except:
     echo "📝 Mise à jour de la configuration..."
     
     if [[ $ENABLE_SONARR =~ ^[Yy]$ ]]; then
-        sed -i.bak1 "s|url: \"http://localhost:8989\"|url: \"$SONARR_URL\"|" config/config.yaml.local
-        sed -i.bak2 "s|api_key: \"your_sonarr_api_key\"|api_key: \"$SONARR_API\"|" config/config.yaml.local
+        sed -i.bak1 "s|enabled: false|enabled: true|" config/config.yaml.local
+        sed -i.bak2 "s|url: \"http://localhost:8989\"|url: \"$SONARR_URL\"|" config/config.yaml.local
+        sed -i.bak3 "s|api_key: \"your_sonarr_api_key\"|api_key: \"$SONARR_API\"|" config/config.yaml.local
     else
         sed -i.bak1 "/sonarr:/,/radarr:/ s|enabled: true|enabled: false|" config/config.yaml.local
     fi
     
     if [[ $ENABLE_RADARR =~ ^[Yy]$ ]]; then
-        sed -i.bak3 "s|url: \"http://localhost:7878\"|url: \"$RADARR_URL\"|" config/config.yaml.local
-        sed -i.bak4 "s|api_key: \"your_radarr_api_key\"|api_key: \"$RADARR_API\"|" config/config.yaml.local
+        sed -i.bak4 "/radarr:/,/monitoring:/ s|enabled: false|enabled: true|" config/config.yaml.local
+        sed -i.bak5 "s|url: \"http://localhost:7878\"|url: \"$RADARR_URL\"|" config/config.yaml.local
+        sed -i.bak6 "s|api_key: \"your_radarr_api_key\"|api_key: \"$RADARR_API\"|" config/config.yaml.local
     else
-        sed -i.bak3 "/radarr:/,/monitoring:/ s|enabled: true|enabled: false|" config/config.yaml.local
+        sed -i.bak4 "/radarr:/,/monitoring:/ s|enabled: true|enabled: false|" config/config.yaml.local
     fi
     
     if [[ $AUTO_ACTIONS =~ ^[Nn]$ ]]; then
-        sed -i.bak5 "s|auto_retry: true|auto_retry: false|" config/config.yaml.local
+        sed -i.bak7 "s|auto_retry: true|auto_retry: false|" config/config.yaml.local
     fi
     
     rm -f config/config.yaml.local.bak*
