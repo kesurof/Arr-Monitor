@@ -181,33 +181,9 @@ fi
 
 echo "✅ Fichiers copiés avec succès"
 
-# Application automatique de la correction du bug get_queue si nécessaire
-echo "🔧 Vérification et correction du code Python..."
-if grep -q "return response\.json()" arr-monitor.py && ! grep -q "isinstance(data, list)" arr-monitor.py; then
-    echo "📝 Application de la correction pour le traitement des queues API..."
-    
-    # Créer une sauvegarde
-    cp arr-monitor.py "arr-monitor.py.backup.$(date +%Y%m%d_%H%M%S)"
-    
-    # Appliquer la correction avec sed
-    sed -i.tmp 's/return response\.json()/data = response.json()\
-                # L'\''API peut retourner une liste directement ou un objet avec '\''records'\''\
-                if isinstance(data, list):\
-                    return data\
-                elif isinstance(data, dict) and '\''records'\'' in data:\
-                    return data['\''records'\'']\
-                else:\
-                    # Si c'\''est un autre format, on retourne une liste vide\
-                    self.logger.warning(f"⚠️  {app_name} format de queue inattendu : {type(data)}")\
-                    return []/' arr-monitor.py
-    
-    # Nettoyer le fichier temporaire
-    rm -f arr-monitor.py.tmp
-    
-    echo "✅ Correction appliquée avec succès"
-else
-    echo "✅ Code déjà corrigé ou à jour"
-fi
+# Application automatique de la correction du bug get_queue supprimée - non nécessaire
+echo "🔧 Vérification du code Python..."
+echo "✅ Fichiers copiés et prêts"
 
 # Détection et gestion de l'environnement virtuel
 echo "🐍 Gestion de l'environnement virtuel Python..."
