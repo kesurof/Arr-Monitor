@@ -2,7 +2,7 @@
 """
 Arr Monitor - Surveillance automatique des erreurs Sonarr/Radarr
 Détecte et corrige automatiquement les téléchargements échoués ou bloqués
-Version: 1.1.0 - Optimisé pour ARM64
+Version: 1.1.4 - Optimisé pour ARM64
 """
 
 import argparse
@@ -23,7 +23,7 @@ class ArrMonitor:
         self.config = self.load_config(config_path)
         self.setup_logging()
         self.session = requests.Session()
-        self.version = "1.1.0"
+        self.version = "1.1.4"
         self.anonymize_enabled = self.config.get('privacy', {}).get('anonymize_logs', True)
         
         # Optimisations ARM64
