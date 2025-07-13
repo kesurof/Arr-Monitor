@@ -1,6 +1,6 @@
-# 🚀 Arr Monitor v1.1.3 - Surveillance Sonarr/Radarr
+# 🚀 Arr Monitor v1.1.4 - Surveillance Sonarr/Radarr
 
-[![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)](https://github.com/kesurof/Arr-Monitor)
+[![Version](https://img.shields.io/badge/version-1.1.4-blue.svg)](https://github.com/kesurof/Arr-Monitor)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![ARM64](https://img.shields.io/badge/ARM64-optimized-green.svg)](https://arm.com)
