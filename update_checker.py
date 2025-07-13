@@ -82,9 +82,9 @@ class UpdateChecker:
             if Path(version_file).exists():
                 with open(version_file, 'r') as f:
                     return f.read().strip()
-            return "1.0.0"  # Version par défaut
+            return "1.1.4"  # Version par défaut synchronisée
         except Exception:
-            return "1.0.0"
+            return "1.1.4"
 
 def main():
     """Test du vérificateur de mises à jour"""
