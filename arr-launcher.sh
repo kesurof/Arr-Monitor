@@ -517,10 +517,14 @@ refresh_config() {
         echo "📁 Fichier modifié : $CONFIG_DIR/config.yaml"
         echo "💾 Sauvegarde disponible : $backup_file"
         
-        # Test de connexion optionnel
-        echo ""
-        read -p "🧪 Voulez-vous tester la connexion maintenant ? [Y/n] : " test_connection
-        test_connection=${test_connection:-Y}
+        # NOUVELLE VERSION (non-bloquante)
+        if [[ "$REFRESH_AUTOMATIC" == "true" ]]; then
+            test_connection="N"  # Pas de test en mode automatique
+            echo "🔄 Mode automatique : test de connexion ignoré"
+        else
+            read -p "🧪 Voulez-vous tester la connexion maintenant ? [Y/n] : " test_connection
+            test_connection=${test_connection:-Y}
+        fi
         
         if [[ $test_connection =~ ^[Yy]$ ]]; then
             echo ""

@@ -155,7 +155,7 @@ class ArrMonitor:
             return False
     
     def call_refresh_config(self):
-        """Appelle la fonction refresh_config d'arr-launcher.sh"""
+        """Appelle la fonction refresh_config d'arr-launcher.sh en mode non-interactif"""
         try:
             import subprocess
             script_dir = Path(__file__).parent
@@ -164,11 +164,15 @@ class ArrMonitor:
             if launcher_script.exists():
                 self.logger.info("🔄 Appel de la fonction refresh_config...")
                 
+                # Préparer l'environnement avec mode automatique
+                env = os.environ.copy()
+                env["REFRESH_AUTOMATIC"] = "true"  # MODE NON-INTERACTIF
+                
                 # Appeler la fonction refresh_config du script arr-launcher.sh
                 result = subprocess.run([
                     "bash", "-c", 
                     f"source {launcher_script} && refresh_config"
-                ], capture_output=True, text=True, timeout=30)
+                ], capture_output=True, text=True, timeout=60, env=env)  # Timeout augmenté à 60s
                 
                 if result.returncode == 0:
                     self.logger.info("✅ Refresh config terminé avec succès")
@@ -182,6 +186,9 @@ class ArrMonitor:
                 self.logger.warning("⚠️ Script arr-launcher.sh non trouvé")
                 return False
                 
+        except subprocess.TimeoutExpired:
+            self.logger.error("❌ Timeout lors du refresh config (>60s)")
+            return False
         except Exception as e:
             self.logger.error(f"❌ Erreur lors du refresh config : {e}")
             return False
