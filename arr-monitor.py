@@ -20,12 +20,13 @@ import json
 
 class ArrMonitor:
     def __init__(self, config_path="config/config.yaml"):
+        self.config_path = config_path  # NOUVELLE LIGNE: stocker le chemin
         self.config = self.load_config(config_path)
         self.setup_logging()
         self.session = requests.Session()
         self.version = self._read_version_file()
         self.anonymize_enabled = self.config.get('privacy', {}).get('anonymize_logs', True)
-        
+
         # Optimisations ARM64
         if platform.machine() in ['aarch64', 'arm64']:
             self.setup_arm64_optimizations()
@@ -153,6 +154,38 @@ class ArrMonitor:
             self.logger.error(f"❌ {app_name} connexion échouée : {e}")
             return False
     
+    def call_refresh_config(self):
+        """Appelle la fonction refresh_config d'arr-launcher.sh"""
+        try:
+            import subprocess
+            script_dir = Path(__file__).parent
+            launcher_script = script_dir / "arr-launcher.sh"
+            
+            if launcher_script.exists():
+                self.logger.info("🔄 Appel de la fonction refresh_config...")
+                
+                # Appeler la fonction refresh_config du script arr-launcher.sh
+                result = subprocess.run([
+                    "bash", "-c", 
+                    f"source {launcher_script} && refresh_config"
+                ], capture_output=True, text=True, timeout=30)
+                
+                if result.returncode == 0:
+                    self.logger.info("✅ Refresh config terminé avec succès")
+                    # Recharger la configuration mise à jour
+                    self.config = self.load_config(self.config_path)
+                    return True
+                else:
+                    self.logger.warning(f"⚠️ Refresh config a échoué : {result.stderr}")
+                    return False
+            else:
+                self.logger.warning("⚠️ Script arr-launcher.sh non trouvé")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"❌ Erreur lors du refresh config : {e}")
+            return False
+
     def get_queue(self, app_name, url, api_key):
         """Récupère la queue des téléchargements avec pagination complète"""
         try:
@@ -403,14 +436,24 @@ class ArrMonitor:
         self.logger.info("✅ Cycle terminé")
     
     def run_continuous(self):
-        """Exécute la surveillance en continu"""
+        """Exécute la surveillance en continu avec refresh automatique des IPs et clés API"""
         check_interval = self.config.get('monitoring', {}).get('check_interval', 300)
-        
         self.logger.info(f"🔄 Démarrage surveillance continue (intervalle: {check_interval}s)")
-        
+
         try:
             while True:
+                # ÉTAPE 1: APPELER LA FONCTION REFRESH EXISTANTE D'ARR-LAUNCHER
+                self.logger.info("🌐 Réactualisation automatique des IPs et clés API...")
+                refresh_success = self.call_refresh_config()
+                
+                if refresh_success:
+                    # Mettre à jour l'intervalle potentiellement modifié
+                    check_interval = self.config.get('monitoring', {}).get('check_interval', 300)
+                
+                # ÉTAPE 2: EXÉCUTER LE CYCLE AVEC LA CONFIGURATION MISE À JOUR
                 self.run_cycle()
+
+                # ÉTAPE 3: PAUSE AVANT LE PROCHAIN CYCLE
                 self.logger.info(f"⏰ Attente {check_interval} secondes...")
                 time.sleep(check_interval)
                 
